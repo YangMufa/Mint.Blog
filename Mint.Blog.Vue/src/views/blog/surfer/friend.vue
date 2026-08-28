@@ -1,13 +1,579 @@
+<template>
+  <div class="friend-page theme-text-primary min-h-screen">
+    <Slide
+      :key="friendHeroImageKey"
+      :src="friendHeroImageSrc"
+      :loading="!friendHeroResolved"
+      class="friend-hero"
+      height="340px"
+      heightMd="400px"
+      heightSm="240px"
+    >
+      <template #skeleton>
+        <div class="friend-hero-skeleton" aria-hidden="true"></div>
+      </template>
+
+      <div
+        class="friend-hero-inner mx-auto flex h-full max-w-screen-2xl items-center justify-center px-4 text-white md:px-6"
+      >
+        <div class="friend-hero-content w-full max-w-5xl text-center md:-translate-y-8">
+          <div class="mb-2 flex justify-center">
+            <span
+              class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/18 text-3xl text-white shadow-2xl backdrop-blur-sm"
+            >
+              <LinkOutlined />
+            </span>
+          </div>
+          <h1 class="mb-2 text-3xl font-bold leading-tight text-white sm:mb-2 sm:text-4xl md:text-5xl">
+            友情链接
+          </h1>
+          <p class="mx-auto mb-4 max-w-2xl text-sm leading-7 text-white/86 sm:text-base">
+            这里收录了一些优秀的技术博客和网站，欢迎互相学习交流。
+          </p>
+          <div class="flex flex-wrap justify-center gap-3">
+            <button
+              class="inline-flex items-center gap-2 rounded-full bg-white/18 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/26"
+              @click="siteInfoModalVisible = true"
+            >
+              <GlobalOutlined />
+              本站友链信息
+            </button>
+            <button
+              class="inline-flex items-center gap-2 rounded-full bg-[#3ecf9a] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#3ecf9a]/25 transition-all hover:-translate-y-0.5 hover:bg-[#15956b] dark:bg-[#539dfd] dark:shadow-[#539dfd]/25 dark:hover:bg-[#8cc8ff]"
+              @click="friendApplicationModalVisible = true"
+            >
+              <MailOutlined />
+              申请友链
+            </button>
+          </div>
+          <div class="mx-auto mt-4 flex max-w-4xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/90 sm:gap-x-6 sm:gap-y-3 sm:text-sm">
+            <div class="flex items-center">
+              <span class="hero-meta-icon bg-[#4fa759]"><TeamOutlined /></span>
+              {{ friends.length }} 个站点
+            </div>
+            <div class="flex items-center">
+              <span class="hero-meta-icon bg-[#5a9cf8]"><GlobalOutlined /></span>
+              {{ categories.length }} 个分类
+            </div>
+          </div>
+        </div>
+      </div>
+    </Slide>
+
+    <!-- 主要内容区域 -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0 pb-20">
+
+      <!-- 分类标签页 -->
+      <div class="friend-category-bar sticky top-0 z-30 -mx-4 mb-0 px-4 pb-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <button
+          class="friend-category-toggle mb-2 flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 px-3 py-1.5 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
+          @click="isMobileCategoryCollapsed = !isMobileCategoryCollapsed"
+        >
+          {{ isMobileCategoryCollapsed ? '展开筛选' : '收起筛选' }}
+          <DownOutlined v-if="isMobileCategoryCollapsed" class="text-xs" />
+          <UpOutlined v-else class="text-xs" />
+        </button>
+        <div
+          class="friend-category-list flex flex-wrap justify-center gap-2"
+          :class="{ 'friend-category-list-collapsed': isMobileCategoryCollapsed }"
+        >
+          <button
+            v-for="category in categories"
+            :key="category.key"
+            class="friend-category-button inline-flex cursor-pointer items-center rounded-xl border px-1.75 py-0.75 text-center text-sm font-medium transition-all duration-300"
+            :class="[
+              activeCategory === category.key
+                ? 'friend-category-button-active shadow-lg'
+                : 'friend-category-button-normal'
+            ]"
+            @click="activeCategory = category.key"
+          >
+            {{ category.label }}
+            <span
+              class="ml-2 px-2 py-0.5 text-xs rounded-full"
+              :class="[
+                activeCategory === category.key
+                  ? 'friend-category-count-active'
+                  : 'friend-category-count-normal'
+              ]"
+            >
+              {{ getCategoryCount(category.key) }}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 加载状态 -->
+      <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div v-for="i in 8" :key="i" class="animate-pulse">
+          <div class="friend-card-skeleton rounded-xl p-6 shadow-sm">
+            <div class="flex items-center space-x-4">
+              <div class="w-12 h-12 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+              <div class="flex-1">
+                <div class="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
+                <div class="h-3 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 友链卡片分组 -->
+      <div v-else-if="friendGroups.length > 0" class="space-y-10">
+        <section v-for="group in friendGroups" :key="group.key" class="friend-group">
+          <div class="mb-5 flex items-center justify-between gap-4">
+            <div>
+              <h2 class="theme-text-primary text-xl font-bold text-gray-900 dark:text-white">
+                {{ group.title }}
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">共 {{ group.friends.length }} 个站点</p>
+            </div>
+            <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div
+              v-for="friend in group.friends"
+              :key="friend.id"
+              class="friend-card theme-text-primary relative rounded-xl p-4 shadow-sm transition-all duration-300 border"
+              :class="[
+                friend.status === 'active'
+                  ? 'friend-card-active group cursor-pointer'
+                  : friend.status === 'pending'
+                    ? 'friend-card-pending'
+                    : 'friend-card-inactive opacity-70'
+              ]"
+              @click="friend.status === 'active' ? visitFriend(friend.url) : null"
+            >
+              <span
+                v-if="friend.status === 'active' && friend.isTop"
+                class="absolute right-3 top-3 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600 shadow-sm dark:bg-red-900/30 dark:text-red-400"
+              >
+                置顶
+              </span>
+              <div class="flex items-start space-x-4">
+                <!-- 头像 -->
+                <div class="flex-shrink-0">
+                  <img
+                    :src="friend.avatar || fallbackAvatar"
+                    :alt="friend.name"
+                    class="w-12 h-12 rounded-full object-cover ring-2 transition-all duration-300"
+                    :class="[
+                      friend.status === 'active'
+                        ? 'ring-gray-200 dark:ring-gray-600 group-hover:ring-blue-300 dark:group-hover:ring-blue-600'
+                        : 'ring-orange-200 dark:ring-orange-600 opacity-70'
+                    ]"
+                    @error="handleImageError"
+                  />
+                </div>
+
+                <!-- 友链信息 -->
+                <div class="flex-1 min-w-0">
+                  <!-- 标题行 -->
+                  <div class="mb-1">
+                    <h3
+                      class="theme-text-primary text-lg font-semibold transition-colors duration-300 truncate"
+                      :class="[
+                        friend.status === 'active'
+                          ? 'text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400'
+                          : friend.status === 'pending'
+                            ? 'text-orange-700 dark:text-orange-400'
+                            : 'text-gray-500 dark:text-gray-400'
+                      ]"
+                    >
+                      {{ friend.name }}
+                    </h3>
+                  </div>
+
+                  <!-- 状态标签行 -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <!-- 分类标签 -->
+                    <span
+                      class="px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
+                      :class="getCategoryStyle(friend.category)"
+                    >
+                      {{ getCategoryLabel(friend.category) }}
+                    </span>
+
+                    <!-- 待审核状态标识 -->
+                    <span
+                      v-if="friend.status === 'pending'"
+                      class="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 rounded-full flex-shrink-0"
+                    >
+                      待审核
+                    </span>
+                    <span
+                      v-else-if="friend.status === 'inactive'"
+                      class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded-full flex-shrink-0"
+                    >
+                      已停用
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <!-- 描述信息 -->
+              <div class="flex-1 min-w-0">
+                <!-- 描述（启用状态显示） -->
+                <p
+                  v-if="friend.status === 'active'"
+                  class="theme-text-primary text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2 leading-relaxed text-left"
+                >
+                  {{ friend.description }}
+                </p>
+                <!-- 链接（启用状态显示） -->
+                <div
+                  v-if="friend.status === 'active'"
+                  class="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-3 justify-start"
+                >
+                  <span
+                    class="ml-[-2px] inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0"
+                    :class="getCategoryStyle(friend.category)"
+                    @click.stop="visitFriend(friend.url)"
+                  >
+                    <ExportOutlined class="mr-1 text-xs" />
+                    访问{{ formatUrl(friend.url) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-else class="text-center py-16">
+        <div
+          class="empty-state-card mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-4"
+        >
+          <LinkOutlined class="text-3xl text-gray-400" />
+        </div>
+        <h3 class="theme-text-primary text-lg font-medium text-gray-900 dark:text-white mb-2">暂无友链</h3>
+        <p class="theme-text-primary text-gray-600 dark:text-gray-400">还没有添加任何友情链接</p>
+      </div>
+    </main>
+  </div>
+  <!-- 本站友链信息弹框 -->
+  <AModal
+    v-model:open="siteInfoModalVisible"
+    title="本站友链信息"
+    :mask-closable="false"
+    :footer="null"
+    :body-style="{ maxHeight: '70vh', overflowY: 'auto', padding: '0' }"
+    width="600px"
+  >
+    <div class="p-6">
+      <div class="text-center mb-6">
+        <img src="@/assets/system/svg/logo.svg" alt="Mint Blog" class="w-16 h-16 mx-auto mb-4 rounded-lg" />
+        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2">{{ siteInfo.name }}</h3>
+        <p class="text-gray-600 dark:text-gray-300">分享技术 · 记录生活</p>
+      </div>
+
+      <div class="space-y-4">
+        <!-- 网站名称 -->
+        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center gap-3">
+            <GlobalOutlined class="text-blue-500" />
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-200">网站名称：</span>
+              <span class="text-gray-900 dark:text-white font-medium">{{ siteInfo.name }}</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <AButton size="small" @click="copySingleInfo('网站名称', siteInfo.name)">
+              <CopyOutlined />
+            </AButton>
+          </div>
+        </div>
+
+        <!-- 网站图标链接 -->
+        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center gap-3">
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-200">网站图标：</span>
+              <span class="text-blue-600 dark:text-blue-400">{{ siteInfo.icon }}</span>
+            </div>
+          </div>
+          <AButton size="small" @click="copySingleInfo('网站图标', siteInfo.icon)">
+            <CopyOutlined />
+          </AButton>
+        </div>
+
+        <!-- 网站分类 -->
+        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center gap-3">
+            <MailOutlined class="text-green-500" />
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-200">网站分类：</span>
+              <span class="text-gray-900 dark:text-white font-medium">{{ siteInfo.category }}</span>
+            </div>
+          </div>
+          <AButton size="small" @click="copySingleInfo('网站分类', siteInfo.category)">
+            <CopyOutlined />
+          </AButton>
+        </div>
+
+        <!-- 网站网址 -->
+        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center gap-3">
+            <LinkOutlined class="text-purple-500" />
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-200">网站网址：</span>
+              <span class="text-blue-600 dark:text-blue-400">{{ siteInfo.url }}</span>
+            </div>
+          </div>
+          <AButton size="small" @click="copySingleInfo('网站网址', siteInfo.url)">
+            <CopyOutlined />
+          </AButton>
+        </div>
+
+        <!-- 网站描述 -->
+        <div class="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+          <div class="flex items-start gap-3 flex-1">
+            <UserOutlined class="text-orange-500 mt-1" />
+            <div class="flex-1">
+              <span class="font-medium text-gray-700 dark:text-gray-200">网站描述：</span>
+              <p class="text-gray-900 dark:text-white mt-1">
+                {{ siteInfo.description }}
+              </p>
+            </div>
+          </div>
+          <AButton size="small" class="ml-2" @click="copySingleInfo('网站描述', siteInfo.description)">
+            <CopyOutlined />
+          </AButton>
+        </div>
+
+        <!-- 复制全部按钮 -->
+        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+          <AButton type="primary" block class="bg-blue-600 hover:bg-blue-700" @click="copyAllInfo">
+            <CopyOutlined class="mr-2" />
+            复制全部信息
+          </AButton>
+        </div>
+      </div>
+    </div>
+  </AModal>
+  <!-- 友链申请模态框 -->
+  <AModal
+    v-model:open="friendApplicationModalVisible"
+    title="友链申请"
+    width="600px"
+    :footer="null"
+    :mask-closable="false"
+    :body-style="{ maxHeight: '70vh', overflowY: 'auto', padding: '0' }"
+  >
+    <div class="friend-application-content py-4 px-6">
+      <div class="mb-6">
+        <div class="flex items-center mb-4">
+          <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3 bg-blue-100 text-blue-500">
+            <MailOutlined />
+          </div>
+          <div>
+            <div class="font-medium text-gray-900 dark:text-white">友情链接申请</div>
+            <div class="text-sm text-gray-500 mt-1">欢迎优质的技术博客申请友链交换！</div>
+          </div>
+        </div>
+
+        <div class="application-info p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
+          <div class="space-y-3 text-sm text-gray-600 dark:text-gray-400">
+            <div class="space-y-2">
+              <p class="font-medium text-gray-900 dark:text-white">申请要求：</p>
+              <ul class="list-disc list-inside space-y-1 text-xs">
+                <li>技术相关的原创博客</li>
+                <li>内容质量较高，更新频率稳定</li>
+                <li>网站访问正常，无违法内容</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- 申请表单 -->
+        <form class="space-y-4" @submit.prevent="handleSubmitFriendApplication">
+          <!-- 网站名称 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              网站名称
+              <span class="text-red-500">*</span>
+            </label>
+            <input
+              v-model="applicationForm.name"
+              type="text"
+              required
+              placeholder="请输入您的网站名称"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+              :class="[
+                fieldErrors.name
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+              ]"
+              @blur="validateField('name')"
+              @input="clearFieldError('name')"
+            />
+            <div v-if="fieldErrors.name" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.name }}
+            </div>
+          </div>
+
+          <!-- 网站图标链接 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              网站图标链接
+              <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <input
+                v-model="applicationForm.avatar"
+                type="url"
+                required
+                placeholder="请输入网站图标的URL地址"
+                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+                :class="[
+                  fieldErrors.avatar
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+                ]"
+                @blur="validateField('avatar')"
+                @input="clearFieldError('avatar')"
+              />
+              <!-- 图标预览 -->
+              <div v-if="applicationForm.avatar && !fieldErrors.avatar" class="absolute right-2 top-2">
+                <img
+                  :src="applicationForm.avatar"
+                  alt="图标预览"
+                  class="w-6 h-6 rounded object-cover"
+                  @error="() => {}"
+                />
+              </div>
+            </div>
+            <div v-if="fieldErrors.avatar" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.avatar }}
+            </div>
+          </div>
+
+          <!-- 网站分类 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              网站分类
+              <span class="text-red-500">*</span>
+            </label>
+            <ASelect
+              v-model:value="applicationForm.category"
+              placeholder="请选择网站分类"
+              class="w-full"
+              :options="categoryOptions"
+              :status="fieldErrors.category ? 'error' : ''"
+              @blur="validateField('category')"
+              @change="clearFieldError('category')"
+            />
+            <div v-if="fieldErrors.category" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.category }}
+            </div>
+          </div>
+
+          <!-- 网站网址 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              网站网址
+              <span class="text-red-500">*</span>
+            </label>
+            <input
+              v-model="applicationForm.url"
+              type="url"
+              required
+              placeholder="请输入您的网站地址"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+              :class="[
+                fieldErrors.url
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+              ]"
+              @blur="validateField('url')"
+              @input="clearFieldError('url')"
+            />
+            <div v-if="fieldErrors.url" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.url }}
+            </div>
+          </div>
+
+          <!-- 网站描述 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              网站描述
+              <span class="text-red-500">*</span>
+              <span class="text-xs text-gray-500 ml-1">({{ applicationForm.description.length }}/200)</span>
+            </label>
+            <textarea
+              v-model="applicationForm.description"
+              required
+              rows="3"
+              maxlength="200"
+              placeholder="请简要描述您的网站内容和特色（至少10个字符）"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none transition-colors"
+              :class="[
+                fieldErrors.description
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+              ]"
+              @blur="validateField('description')"
+              @input="clearFieldError('description')"
+            ></textarea>
+            <div v-if="fieldErrors.description" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.description }}
+            </div>
+          </div>
+
+          <!-- 联系邮箱 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">联系邮箱</label>
+            <input
+              v-model="applicationForm.email"
+              type="email"
+              placeholder="请输入您的联系邮箱（可选）"
+              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
+              :class="[
+                fieldErrors.email
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
+              ]"
+              @blur="validateField('email')"
+              @input="clearFieldError('email')"
+            />
+            <div v-if="fieldErrors.email" class="mt-1 text-sm text-red-500">
+              {{ fieldErrors.email }}
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- 申请按钮区域 -->
+      <div class="modal-footer flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-600">
+        <AButton size="middle" @click="friendApplicationModalVisible = false">取消</AButton>
+        <AButton
+          type="primary"
+          size="middle"
+          :loading="submitting"
+          class="bg-blue-600 hover:bg-blue-700"
+          @click="handleSubmitFriendApplication"
+        >
+          <MailOutlined class="mr-1" />
+          {{ submitting ? '提交中...' : '提交申请' }}
+        </AButton>
+      </div>
+    </div>
+  </AModal>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import {
   CopyOutlined,
+  DownOutlined,
   ExportOutlined,
   GlobalOutlined,
   LinkOutlined,
   MailOutlined,
   TeamOutlined,
+  UpOutlined,
   UserOutlined
 } from '@ant-design/icons-vue';
 import {
@@ -28,6 +594,7 @@ const loading = ref(true);
 const friendApplicationModalVisible = ref(false);
 const siteInfoModalVisible = ref(false);
 const activeCategory = ref('all');
+const isMobileCategoryCollapsed = ref(true);
 const submitting = ref(false);
 const friendHeroImages = Object.values(
   import.meta.glob('@/assets/blog/surfer/article-banner/*.{png,jpg,jpeg,webp,avif,gif}', {
@@ -587,555 +1154,6 @@ onBeforeUnmount(() => {
 });
 </script>
 
-<template>
-  <div class="friend-page theme-text-primary min-h-screen">
-    <Slide
-      :key="friendHeroImageKey"
-      :src="friendHeroImageSrc"
-      :loading="!friendHeroResolved"
-      class="friend-hero"
-    >
-      <template #skeleton>
-        <div class="friend-hero-skeleton" aria-hidden="true"></div>
-      </template>
-
-      <div
-        class="friend-hero-inner mx-auto flex h-full max-w-screen-2xl items-center justify-center px-4 text-white md:px-6"
-      >
-        <div class="friend-hero-content w-full max-w-5xl text-center md:-translate-y-8">
-          <div class="mb-5 flex justify-center">
-            <span
-              class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/18 text-3xl text-white shadow-2xl backdrop-blur-sm"
-            >
-              <LinkOutlined />
-            </span>
-          </div>
-          <h1 class="mb-5 text-3xl font-bold leading-tight text-white sm:mb-8 sm:text-4xl md:text-5xl">
-            友情链接
-          </h1>
-          <p class="mx-auto mb-7 max-w-2xl text-sm leading-7 text-white/86 sm:text-base">
-            这里收录了一些优秀的技术博客和网站，欢迎互相学习交流。
-          </p>
-          <div class="flex flex-wrap justify-center gap-3">
-            <button
-              class="inline-flex items-center gap-2 rounded-full bg-white/18 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/26"
-              @click="siteInfoModalVisible = true"
-            >
-              <GlobalOutlined />
-              本站友链信息
-            </button>
-            <button
-              class="inline-flex items-center gap-2 rounded-full bg-[#3ecf9a] px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#3ecf9a]/25 transition-all hover:-translate-y-0.5 hover:bg-[#15956b] dark:bg-[#539dfd] dark:shadow-[#539dfd]/25 dark:hover:bg-[#8cc8ff]"
-              @click="friendApplicationModalVisible = true"
-            >
-              <MailOutlined />
-              申请友链
-            </button>
-          </div>
-          <div class="mx-auto mt-7 flex max-w-4xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/90 sm:gap-x-6 sm:gap-y-3 sm:text-sm">
-            <div class="flex items-center">
-              <span class="hero-meta-icon bg-[#4fa759]"><TeamOutlined /></span>
-              {{ friends.length }} 个站点
-            </div>
-            <div class="flex items-center">
-              <span class="hero-meta-icon bg-[#5a9cf8]"><GlobalOutlined /></span>
-              {{ categories.length }} 个分类
-            </div>
-          </div>
-        </div>
-      </div>
-    </Slide>
-
-    <!-- 主要内容区域 -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 pb-20">
-      <!-- 分类标签页 -->
-      <div class="friend-category-bar sticky top-0 z-30 -mx-4 mb-8 border-b px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div class="flex flex-wrap gap-2 justify-center">
-          <button
-            v-for="category in categories"
-            :key="category.key"
-            class="friend-category-button border px-4 py-2 rounded-lg font-medium transition-all duration-300"
-            :class="[
-              activeCategory === category.key
-                ? 'friend-category-button-active shadow-lg'
-                : 'friend-category-button-normal'
-            ]"
-            @click="activeCategory = category.key"
-          >
-            {{ category.label }}
-            <span
-              class="ml-2 px-2 py-0.5 text-xs rounded-full"
-              :class="[
-                activeCategory === category.key
-                  ? 'friend-category-count-active'
-                  : 'friend-category-count-normal'
-              ]"
-            >
-              {{ getCategoryCount(category.key) }}
-            </span>
-          </button>
-        </div>
-      </div>
-
-      <!-- 加载状态 -->
-      <div v-if="loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        <div v-for="i in 8" :key="i" class="animate-pulse">
-          <div class="friend-card-skeleton rounded-xl p-6 shadow-sm">
-            <div class="flex items-center space-x-4">
-              <div class="w-12 h-12 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
-              <div class="flex-1">
-                <div class="h-4 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
-                <div class="h-3 bg-gray-300 dark:bg-gray-600 rounded w-3/4"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 友链卡片分组 -->
-      <div v-else-if="friendGroups.length > 0" class="space-y-10">
-        <section v-for="group in friendGroups" :key="group.key" class="friend-group">
-          <div class="mb-5 flex items-center justify-between gap-4">
-            <div>
-              <h2 class="theme-text-primary text-xl font-bold text-gray-900 dark:text-white">
-                {{ group.title }}
-              </h2>
-              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">共 {{ group.friends.length }} 个站点</p>
-            </div>
-            <div class="h-px flex-1 bg-gray-200 dark:bg-gray-700"></div>
-          </div>
-
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <div
-              v-for="friend in group.friends"
-              :key="friend.id"
-              class="friend-card theme-text-primary relative rounded-xl p-6 shadow-sm transition-all duration-300 border"
-              :class="[
-                friend.status === 'active'
-                  ? 'friend-card-active group cursor-pointer'
-                  : friend.status === 'pending'
-                    ? 'friend-card-pending'
-                    : 'friend-card-inactive opacity-70'
-              ]"
-              @click="friend.status === 'active' ? visitFriend(friend.url) : null"
-            >
-              <span
-                v-if="friend.status === 'active' && friend.isTop"
-                class="absolute right-3 top-3 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-600 shadow-sm dark:bg-red-900/30 dark:text-red-400"
-              >
-                置顶
-              </span>
-              <div class="flex items-start space-x-4">
-                <!-- 头像 -->
-                <div class="flex-shrink-0">
-                  <img
-                    :src="friend.avatar || fallbackAvatar"
-                    :alt="friend.name"
-                    class="w-12 h-12 rounded-full object-cover ring-2 transition-all duration-300"
-                    :class="[
-                      friend.status === 'active'
-                        ? 'ring-gray-200 dark:ring-gray-600 group-hover:ring-blue-300 dark:group-hover:ring-blue-600'
-                        : 'ring-orange-200 dark:ring-orange-600 opacity-70'
-                    ]"
-                    @error="handleImageError"
-                  />
-                </div>
-
-                <!-- 友链信息 -->
-                <div class="flex-1 min-w-0">
-                  <!-- 标题行 -->
-                  <div class="mb-1">
-                    <h3
-                      class="theme-text-primary text-lg font-semibold transition-colors duration-300 truncate"
-                      :class="[
-                        friend.status === 'active'
-                          ? 'text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400'
-                          : friend.status === 'pending'
-                            ? 'text-orange-700 dark:text-orange-400'
-                            : 'text-gray-500 dark:text-gray-400'
-                      ]"
-                    >
-                      {{ friend.name }}
-                    </h3>
-                  </div>
-
-                  <!-- 状态标签行 -->
-                  <div class="flex items-center gap-2 mb-2">
-                    <!-- 分类标签 -->
-                    <span
-                      class="px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0"
-                      :class="getCategoryStyle(friend.category)"
-                    >
-                      {{ getCategoryLabel(friend.category) }}
-                    </span>
-
-                    <!-- 待审核状态标识 -->
-                    <span
-                      v-if="friend.status === 'pending'"
-                      class="px-2 py-0.5 text-xs font-medium bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 rounded-full flex-shrink-0"
-                    >
-                      待审核
-                    </span>
-                    <span
-                      v-else-if="friend.status === 'inactive'"
-                      class="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400 rounded-full flex-shrink-0"
-                    >
-                      已停用
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <!-- 描述信息 -->
-              <div class="flex-1 min-w-0">
-                <!-- 描述（启用状态显示） -->
-                <p
-                  v-if="friend.status === 'active'"
-                  class="theme-text-primary text-sm text-gray-600 dark:text-gray-400 mt-2 line-clamp-2 leading-relaxed text-left"
-                >
-                  {{ friend.description }}
-                </p>
-                <!-- 链接（启用状态显示） -->
-                <div
-                  v-if="friend.status === 'active'"
-                  class="flex items-center text-xs text-gray-500 dark:text-gray-500 mt-3 justify-start"
-                >
-                  <span
-                    class="ml-[-2px] inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0"
-                    :class="getCategoryStyle(friend.category)"
-                    @click.stop="visitFriend(friend.url)"
-                  >
-                    <ExportOutlined class="mr-1 text-xs" />
-                    访问{{ formatUrl(friend.url) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <!-- 空状态 -->
-      <div v-else class="text-center py-16">
-        <div
-          class="empty-state-card mx-auto w-24 h-24 rounded-full flex items-center justify-center mb-4"
-        >
-          <LinkOutlined class="text-3xl text-gray-400" />
-        </div>
-        <h3 class="theme-text-primary text-lg font-medium text-gray-900 dark:text-white mb-2">暂无友链</h3>
-        <p class="theme-text-primary text-gray-600 dark:text-gray-400">还没有添加任何友情链接</p>
-      </div>
-    </main>
-  </div>
-  <!-- 本站友链信息弹框 -->
-  <AModal
-    v-model:open="siteInfoModalVisible"
-    title="本站友链信息"
-    :mask-closable="false"
-    :footer="null"
-    :body-style="{ maxHeight: '70vh', overflowY: 'auto', padding: '0' }"
-    width="600px"
-  >
-    <div class="p-6">
-      <div class="text-center mb-6">
-        <img src="@/assets/system/svg/logo.svg" alt="Mint Blog" class="w-16 h-16 mx-auto mb-4 rounded-lg" />
-        <h3 class="text-xl font-bold text-gray-800 dark:text-white mb-2">{{ siteInfo.name }}</h3>
-        <p class="text-gray-600 dark:text-gray-300">分享技术 · 记录生活</p>
-      </div>
-
-      <div class="space-y-4">
-        <!-- 网站名称 -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div class="flex items-center gap-3">
-            <GlobalOutlined class="text-blue-500" />
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-200">网站名称：</span>
-              <span class="text-gray-900 dark:text-white font-medium">{{ siteInfo.name }}</span>
-            </div>
-          </div>
-          <div class="flex gap-2">
-            <AButton size="small" @click="copySingleInfo('网站名称', siteInfo.name)">
-              <CopyOutlined />
-            </AButton>
-          </div>
-        </div>
-
-        <!-- 网站图标链接 -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div class="flex items-center gap-3">
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-200">网站图标：</span>
-              <span class="text-blue-600 dark:text-blue-400">{{ siteInfo.icon }}</span>
-            </div>
-          </div>
-          <AButton size="small" @click="copySingleInfo('网站图标', siteInfo.icon)">
-            <CopyOutlined />
-          </AButton>
-        </div>
-
-        <!-- 网站分类 -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div class="flex items-center gap-3">
-            <MailOutlined class="text-green-500" />
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-200">网站分类：</span>
-              <span class="text-gray-900 dark:text-white font-medium">{{ siteInfo.category }}</span>
-            </div>
-          </div>
-          <AButton size="small" @click="copySingleInfo('网站分类', siteInfo.category)">
-            <CopyOutlined />
-          </AButton>
-        </div>
-
-        <!-- 网站网址 -->
-        <div class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div class="flex items-center gap-3">
-            <LinkOutlined class="text-purple-500" />
-            <div>
-              <span class="font-medium text-gray-700 dark:text-gray-200">网站网址：</span>
-              <span class="text-blue-600 dark:text-blue-400">{{ siteInfo.url }}</span>
-            </div>
-          </div>
-          <AButton size="small" @click="copySingleInfo('网站网址', siteInfo.url)">
-            <CopyOutlined />
-          </AButton>
-        </div>
-
-        <!-- 网站描述 -->
-        <div class="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-          <div class="flex items-start gap-3 flex-1">
-            <UserOutlined class="text-orange-500 mt-1" />
-            <div class="flex-1">
-              <span class="font-medium text-gray-700 dark:text-gray-200">网站描述：</span>
-              <p class="text-gray-900 dark:text-white mt-1">
-                {{ siteInfo.description }}
-              </p>
-            </div>
-          </div>
-          <AButton size="small" class="ml-2" @click="copySingleInfo('网站描述', siteInfo.description)">
-            <CopyOutlined />
-          </AButton>
-        </div>
-
-        <!-- 复制全部按钮 -->
-        <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <AButton type="primary" block class="bg-blue-600 hover:bg-blue-700" @click="copyAllInfo">
-            <CopyOutlined class="mr-2" />
-            复制全部信息
-          </AButton>
-        </div>
-      </div>
-    </div>
-  </AModal>
-  <!-- 友链申请模态框 -->
-  <AModal
-    v-model:open="friendApplicationModalVisible"
-    title="友链申请"
-    width="600px"
-    :footer="null"
-    :mask-closable="false"
-    :body-style="{ maxHeight: '70vh', overflowY: 'auto', padding: '0' }"
-  >
-    <div class="friend-application-content py-4 px-6">
-      <div class="mb-6">
-        <div class="flex items-center mb-4">
-          <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3 bg-blue-100 text-blue-500">
-            <MailOutlined />
-          </div>
-          <div>
-            <div class="font-medium text-gray-900 dark:text-white">友情链接申请</div>
-            <div class="text-sm text-gray-500 mt-1">欢迎优质的技术博客申请友链交换！</div>
-          </div>
-        </div>
-
-        <div class="application-info p-4 bg-gray-50 dark:bg-gray-800 rounded-lg mb-4">
-          <div class="space-y-3 text-sm text-gray-600 dark:text-gray-400">
-            <div class="space-y-2">
-              <p class="font-medium text-gray-900 dark:text-white">申请要求：</p>
-              <ul class="list-disc list-inside space-y-1 text-xs">
-                <li>技术相关的原创博客</li>
-                <li>内容质量较高，更新频率稳定</li>
-                <li>网站访问正常，无违法内容</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        <!-- 申请表单 -->
-        <form class="space-y-4" @submit.prevent="handleSubmitFriendApplication">
-          <!-- 网站名称 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              网站名称
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="applicationForm.name"
-              type="text"
-              required
-              placeholder="请输入您的网站名称"
-              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-              :class="[
-                fieldErrors.name
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-              ]"
-              @blur="validateField('name')"
-              @input="clearFieldError('name')"
-            />
-            <div v-if="fieldErrors.name" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.name }}
-            </div>
-          </div>
-
-          <!-- 网站图标链接 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              网站图标链接
-              <span class="text-red-500">*</span>
-            </label>
-            <div class="relative">
-              <input
-                v-model="applicationForm.avatar"
-                type="url"
-                required
-                placeholder="请输入网站图标的URL地址"
-                class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-                :class="[
-                  fieldErrors.avatar
-                    ? 'border-red-500 focus:ring-red-500'
-                    : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-                ]"
-                @blur="validateField('avatar')"
-                @input="clearFieldError('avatar')"
-              />
-              <!-- 图标预览 -->
-              <div v-if="applicationForm.avatar && !fieldErrors.avatar" class="absolute right-2 top-2">
-                <img
-                  :src="applicationForm.avatar"
-                  alt="图标预览"
-                  class="w-6 h-6 rounded object-cover"
-                  @error="() => {}"
-                />
-              </div>
-            </div>
-            <div v-if="fieldErrors.avatar" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.avatar }}
-            </div>
-          </div>
-
-          <!-- 网站分类 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              网站分类
-              <span class="text-red-500">*</span>
-            </label>
-            <ASelect
-              v-model:value="applicationForm.category"
-              placeholder="请选择网站分类"
-              class="w-full"
-              :options="categoryOptions"
-              :status="fieldErrors.category ? 'error' : ''"
-              @blur="validateField('category')"
-              @change="clearFieldError('category')"
-            />
-            <div v-if="fieldErrors.category" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.category }}
-            </div>
-          </div>
-
-          <!-- 网站网址 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              网站网址
-              <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="applicationForm.url"
-              type="url"
-              required
-              placeholder="请输入您的网站地址"
-              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-              :class="[
-                fieldErrors.url
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-              ]"
-              @blur="validateField('url')"
-              @input="clearFieldError('url')"
-            />
-            <div v-if="fieldErrors.url" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.url }}
-            </div>
-          </div>
-
-          <!-- 网站描述 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              网站描述
-              <span class="text-red-500">*</span>
-              <span class="text-xs text-gray-500 ml-1">({{ applicationForm.description.length }}/200)</span>
-            </label>
-            <textarea
-              v-model="applicationForm.description"
-              required
-              rows="3"
-              maxlength="200"
-              placeholder="请简要描述您的网站内容和特色（至少10个字符）"
-              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white resize-none transition-colors"
-              :class="[
-                fieldErrors.description
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-              ]"
-              @blur="validateField('description')"
-              @input="clearFieldError('description')"
-            ></textarea>
-            <div v-if="fieldErrors.description" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.description }}
-            </div>
-          </div>
-
-          <!-- 联系邮箱 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">联系邮箱</label>
-            <input
-              v-model="applicationForm.email"
-              type="email"
-              placeholder="请输入您的联系邮箱（可选）"
-              class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white transition-colors"
-              :class="[
-                fieldErrors.email
-                  ? 'border-red-500 focus:ring-red-500'
-                  : 'border-gray-300 dark:border-gray-600 focus:ring-blue-500'
-              ]"
-              @blur="validateField('email')"
-              @input="clearFieldError('email')"
-            />
-            <div v-if="fieldErrors.email" class="mt-1 text-sm text-red-500">
-              {{ fieldErrors.email }}
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <!-- 申请按钮区域 -->
-      <div class="modal-footer flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-600">
-        <AButton size="middle" @click="friendApplicationModalVisible = false">取消</AButton>
-        <AButton
-          type="primary"
-          size="middle"
-          :loading="submitting"
-          class="bg-blue-600 hover:bg-blue-700"
-          @click="handleSubmitFriendApplication"
-        >
-          <MailOutlined class="mr-1" />
-          {{ submitting ? '提交中...' : '提交申请' }}
-        </AButton>
-      </div>
-    </div>
-  </AModal>
-</template>
-
 <style>
 /* 友链申请弹框样式优化 - 使用全局样式确保生效 */
 .ant-modal .ant-modal-close {
@@ -1234,6 +1252,14 @@ onBeforeUnmount(() => {
   background: var(--friend-primary-soft);
 }
 
+.friend-category-toggle {
+  display: none;
+}
+
+.friend-category-list-collapsed {
+  display: flex;
+}
+
 .friend-category-count-active {
   background: rgb(255 255 255 / 18%);
   color: #fff;
@@ -1307,6 +1333,14 @@ onBeforeUnmount(() => {
 
 // 响应式设计
 @media (max-width: 768px) {
+  .friend-category-toggle {
+    display: flex;
+  }
+
+  .friend-category-list-collapsed {
+    display: none;
+  }
+
   .friend-hero-content {
     transform: translateY(0);
   }

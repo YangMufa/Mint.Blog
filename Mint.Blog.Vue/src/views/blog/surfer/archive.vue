@@ -64,6 +64,7 @@ function getArchives(pageNo: number) {
 }
 
 function selectYear(year: number | '') {
+  isYearCollapsed.value = true;
   router.push({
     path: '/blog/surfer/archive',
     query: { year: year ? String(year) : undefined }
@@ -103,7 +104,7 @@ onMounted(async () => {
     <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
       <div class="col-span-1 mt-0 mb-3 lg:col-span-3 lg:mt-2">
         <div
-          class="sticky top-2 z-20 mb-3 w-full rounded-lg border border-[#3ecf9a]/14 bg-white/95 px-2.5 py-2.5 shadow-sm backdrop-blur-md dark:border-[#334155] dark:bg-[#2c333e]/95"
+          class="sticky top-4 z-20 mb-3 w-full rounded-lg border border-[#3ecf9a]/14 bg-white/95 px-2.5 py-2.5 shadow-sm backdrop-blur-md dark:border-[#334155] dark:bg-[#2c333e]/95 lg:top-6"
         >
           <h2 class="mb-1 flex items-center font-bold text-[#0d3d2d] dark:text-white">
             <CalendarOutlined class="mr-1 h-5 w-5 text-[#3ecf9a]" />
@@ -113,9 +114,17 @@ onMounted(async () => {
             </span>
           </h2>
 
+          <button
+            class="archive-toggle mb-2 flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 px-3 py-1.5 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
+            @click="isYearCollapsed = !isYearCollapsed"
+          >
+            {{ isYearCollapsed ? '展开筛选' : '收起筛选' }}
+            <DownOutlined v-if="isYearCollapsed" class="text-xs" />
+            <UpOutlined v-else class="text-xs" />
+          </button>
           <div
             v-if="availableYears.length"
-            class="flex flex-wrap gap-x-1.5 gap-y-1.5 text-sm font-medium transition-[max-height] duration-300"
+            class="archive-list flex flex-wrap gap-x-1.5 gap-y-1.5 text-sm font-medium transition-[max-height] duration-300"
             :class="
               isYearCollapsed
                 ? 'max-h-[100px] overflow-y-auto overflow-x-hidden pr-1'
@@ -160,7 +169,7 @@ onMounted(async () => {
 
           <button
             v-if="availableYears.length > 8"
-            class="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 py-1 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
+            class="archive-more-toggle mt-2 hidden w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 py-1 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14 lg:flex"
             @click="isYearCollapsed = !isYearCollapsed"
           >
             {{ isYearCollapsed ? `展开全部年份（${availableYears.length}）` : '收起年份' }}
@@ -257,6 +266,28 @@ onMounted(async () => {
 @media (min-width: 1024px) {
   .archive-sidebar :deep(aside) {
     top: 20px;
+  }
+}
+
+.archive-toggle {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .archive-toggle {
+    display: flex;
+  }
+
+  .archive-list.max-h-\[100px\] {
+    display: none;
+  }
+
+  .archive-list.max-h-\[180px\] {
+    overflow-y: auto;
+  }
+
+  .archive-sidebar :deep(aside) {
+    top: 0;
   }
 }
 

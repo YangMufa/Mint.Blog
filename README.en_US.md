@@ -150,7 +150,7 @@ pnpm build
 
 ## Ecosystem
 
-- [Mint.Admin](https://github.com/YangGongziDev/Mint.Admin): A .NET DDD rapid development framework for admin systems, rebuilt based on Mint.Blog V2.
+- [Mint.Admin](https://github.com/YangGongziDev/Mint.Admin): A .NET DDD rapid development framework for admin systems, rebuilt based on Mint.Blog.
 
 
 ## How to Contribute

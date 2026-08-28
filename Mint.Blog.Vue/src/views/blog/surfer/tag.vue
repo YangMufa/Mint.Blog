@@ -69,6 +69,7 @@ function goArticleDetailPage(articleId: number) {
   router.push(`/blog/surfer/article/${articleId}`);
 }
 function goTagPage(id: number, name: string) {
+  isMobileTagCollapsed.value = true;
   router.push({ path: '/blog/surfer/tag', query: { id: String(id), name } });
 }
 function goPage(page: number) {
@@ -110,15 +111,23 @@ onMounted(async () => {
       <div class="col-span-1 mt-0 mb-3 lg:col-span-3 lg:mt-2">
         <div
           v-if="allTags.length > 0"
-          class="sticky top-2 z-20 mb-3 w-full rounded-lg border border-[#3ecf9a]/14 bg-white/95 px-2.5 py-2.5 shadow-sm backdrop-blur-md dark:border-[#334155] dark:bg-[#2c333e]/95"
+          class="sticky top-4 z-20 mb-3 w-full rounded-lg border border-[#3ecf9a]/14 bg-white/95 px-2.5 py-2.5 shadow-sm backdrop-blur-md dark:border-[#334155] dark:bg-[#2c333e]/95 lg:top-6"
         >
           <h2 class="mb-1 flex items-center font-bold text-[#0d3d2d] dark:text-white">
             <TagOutlined class="mr-1 h-5 w-5 text-[#3ecf9a]" />
             标签
             <span class="ml-1 font-normal text-[#557468] dark:text-[#cbd5e1]">( {{ allTags.length }} )</span>
           </h2>
+          <button
+            class="tag-toggle mb-2 flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 px-3 py-1.5 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
+            @click="isMobileTagCollapsed = !isMobileTagCollapsed"
+          >
+            {{ isMobileTagCollapsed ? '展开筛选' : '收起筛选' }}
+            <DownOutlined v-if="isMobileTagCollapsed" class="text-xs" />
+            <UpOutlined v-else class="text-xs" />
+          </button>
           <div
-            class="flex flex-wrap gap-x-1.5 gap-y-1.5 text-sm font-medium transition-[max-height] duration-300"
+            class="tag-list flex flex-wrap gap-x-1.5 gap-y-1.5 text-sm font-medium transition-[max-height] duration-300"
             :class="
               isMobileTagCollapsed
                 ? 'max-h-[100px] overflow-y-auto overflow-x-hidden pr-1'
@@ -151,7 +160,7 @@ onMounted(async () => {
           </div>
           <button
             v-if="allTags.length > 8"
-            class="mt-2 flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 py-1 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
+            class="tag-more-toggle mt-2 hidden w-full cursor-pointer items-center justify-center gap-1 rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 py-1 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14 lg:flex"
             @click="isMobileTagCollapsed = !isMobileTagCollapsed"
           >
             {{ isMobileTagCollapsed ? `展开全部标签（${allTags.length}）` : '收起标签' }}
@@ -229,6 +238,28 @@ onMounted(async () => {
 @media (min-width: 1024px) {
   .tag-sidebar :deep(aside) {
     top: 0.5rem;
+  }
+}
+
+.tag-toggle {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .tag-toggle {
+    display: flex;
+  }
+
+  .tag-list.max-h-\[100px\] {
+    display: none;
+  }
+
+  .tag-list.max-h-\[180px\] {
+    overflow-y: auto;
+  }
+
+  .tag-sidebar :deep(aside) {
+    top: 0;
   }
 }
 </style>

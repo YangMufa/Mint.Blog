@@ -1,3 +1,248 @@
+<template>
+  <div>
+    <Slide :key="heroImageKey" :src="articleHeroImageSrc" :loading="!heroResolved" class="article-hero">
+      <template #skeleton>
+        <div class="article-hero-skeleton" aria-hidden="true">
+          <div class="article-hero-skeleton-cover"></div>
+          <div class="article-hero-skeleton-body">
+            <div class="article-hero-skeleton-line article-hero-skeleton-title"></div>
+            <div class="article-hero-skeleton-meta">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+            <div class="article-hero-skeleton-info">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div
+        class="article-hero-inner mx-auto flex h-full max-w-screen-2xl items-center justify-center px-4 text-white md:px-6"
+      >
+        <div v-if="loading" class="w-full max-w-3xl animate-pulse space-y-5 text-center">
+          <div class="mx-auto h-10 w-3/4 rounded-xl bg-white/20"></div>
+          <div class="mx-auto flex justify-center gap-3">
+            <div v-for="i in 3" :key="i" class="h-7 w-20 rounded-full bg-white/16"></div>
+          </div>
+          <div class="mx-auto flex justify-center gap-5">
+            <div v-for="i in 4" :key="i" class="h-5 w-24 rounded bg-white/12"></div>
+          </div>
+        </div>
+
+        <div
+          v-else-if="articleNotFound"
+          class="flex flex-col items-center justify-center text-center custom-text-shadow"
+        >
+          <div class="text-7xl font-black text-white/50">404</div>
+          <h2 class="mt-4 text-2xl font-bold text-white">文章不存在</h2>
+          <p class="mt-2 text-sm text-white/78">该文章可能已被删除或链接地址错误</p>
+          <RouterLink
+            to="/blog/surfer/home"
+            class="mt-6 inline-flex rounded-full bg-[#3ecf9a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#15956b] dark:bg-[#539dfd] dark:hover:bg-[#8cc8ff]"
+          >
+            返回首页
+          </RouterLink>
+        </div>
+
+        <template v-else>
+          <div class="article-hero-content w-full max-w-5xl text-center custom-text-shadow md:-translate-y-8">
+            <h1
+              :key="article.title"
+              class="article-typing-title mb-5 text-3xl font-bold leading-tight text-white sm:mb-8 sm:text-4xl md:text-5xl"
+            >
+              <span class="article-typed-title-text">{{ typedArticleTitle }}</span>
+              <!--
+              -->
+              <span class="article-title-cursor">|</span>
+            </h1>
+
+            <div
+              v-if="article.tags && article.tags.length > 0"
+              class="mb-4 flex flex-wrap justify-center gap-2 sm:mb-5"
+            >
+              <ATooltip v-for="tag in article.tags" :key="tag.id" title="标签">
+                <button
+                  class="inline-flex cursor-pointer rounded-full bg-white/18 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/26"
+                  @click="goTagArticleListPage(tag.id!, tag.name!)"
+                >
+                  # {{ tag.name }}
+                </button>
+              </ATooltip>
+            </div>
+
+            <div
+              class="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/90 sm:gap-x-6 sm:gap-y-3 sm:text-sm"
+            >
+              <ATooltip title="分类">
+                <div class="flex items-center">
+                  <span class="hero-meta-icon bg-[#4fa759]"><FolderOutlined /></span>
+                  <button
+                    class="cursor-pointer hover:underline"
+                    @click="goCategoryArticleListPage(article.categoryId!, article.categoryName!)"
+                  >
+                    {{ article.categoryName }}
+                  </button>
+                </div>
+              </ATooltip>
+              <ATooltip title="发布时间">
+                <div class="flex items-center">
+                  <span class="hero-meta-icon bg-[#ea3b24]"><CalendarOutlined /></span>
+                  {{ formatDateTime(article.createTime) }}
+                </div>
+              </ATooltip>
+              <ATooltip title="阅读人次">
+                <div class="flex items-center">
+                  <span class="hero-meta-icon bg-[#f59e0b]"><EyeOutlined /></span>
+                  {{ article.readNum }}
+                </div>
+              </ATooltip>
+              <ATooltip title="总字数">
+                <div class="flex items-center">
+                  <span class="hero-meta-icon bg-[#a543e6]"><FileTextOutlined /></span>
+                  {{ article.totalWords }} 字
+                </div>
+              </ATooltip>
+              <ATooltip title="阅读耗时">
+                <div class="flex items-center">
+                  <span class="hero-meta-icon bg-[#5a9cf8]"><ClockCircleOutlined /></span>
+                  {{ article.readTime }}
+                </div>
+              </ATooltip>
+            </div>
+          </div>
+        </template>
+      </div>
+    </Slide>
+
+    <main class="mx-auto max-w-screen-2xl px-1 py-1 md:px-6">
+      <ARow :gutter="[28, 28]">
+        <ACol :xs="24" :md="desktopTocVisible && hasTocHeadings ? 18 : 24" class="min-h-0">
+          <div v-if="!loading && !articleNotFound && article.content" class="mb-3">
+            <div
+              class="rounded-lg border border-[#3ecf9a]/14 bg-white/84 p-2 mb-3 dark:border-[#334155] dark:bg-[#2c333e]/72"
+            >
+              <article>
+                <div>
+                  <div
+                    ref="articleContentRef"
+                    class="mt-5 leading-relaxed article-content"
+                    @click="handleArticleContentClick"
+                    v-html="renderedContent"
+                  ></div>
+                </div>
+
+                <div class="flex items-center text-sm mt-5 mb-5 text-[#557468] dark:text-[#cbd5e1]">
+                  <EditOutlined class="icon inline-block w-4 h-4 mr-1" />
+                  最后编辑于 {{ formatDateTime(article.updateTime) }}
+                </div>
+
+                <div class="mt-6 mb-6">
+                  <div
+                    class="flex items-start gap-3 p-4 rounded-xl border shadow-sm bg-[#f0faf5]/80 text-[#557468] border-[#3ecf9a]/14 dark:bg-[#2c333e]/60 dark:text-[#cbd5e1] dark:border-[#334155]"
+                  >
+                    <CopyrightOutlined class="w-5 h-5 text-[#3ecf9a] dark:text-[#539dfd] mt-0.5 shrink-0" />
+                    <div>
+                      <p class="text-sm font-bold uppercase tracking-wide text-[#557468] dark:text-[#cbd5e1] mb-1">
+                        版权声明
+                      </p>
+                      <p class="whitespace-pre-line text-sm leading-relaxed">
+                        {{ copyrightDeclaration }}
+                      </p>
+                      <div class="mt-2 text-xs flex items-start gap-1 text-[#557468] dark:text-[#cbd5e1]">
+                        <LinkOutlined class="mt-[2px] w-3.5 h-3.5 shrink-0" />
+                        <span class="text-sm shrink-0">原文链接：</span>
+                        <a
+                          :href="currentArticleUrl"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          class="text-sm text-[#3ecf9a] dark:text-[#539dfd] hover:underline break-all"
+                        >
+                          {{ currentArticleUrl }}
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <nav class="flex justify-between mt-7">
+                  <button
+                    v-if="article.preArticle"
+                    class="cursor-pointer flex flex-col h-full p-4 text-base font-medium text-[#557468] bg-white border border-gray-200 rounded-lg hover:border-[#3ecf9a] hover:bg-[#f0faf5] hover:text-[#3ecf9a] dark:bg-[#2c333e]/72 dark:border-[#334155] dark:text-[#cbd5e1] dark:hover:bg-[white/8] dark:hover:text-white transition-colors max-w-[48%]"
+                    @click="router.push('/blog/surfer/article/' + article.preArticle.articleId)"
+                  >
+                    <div>
+                      <LeftOutlined class="inline w-3.5 h-3.5 mr-2 mb-1" />
+                      上一篇
+                    </div>
+                    <div class="line-clamp-1">{{ article.preArticle.articleTitle }}</div>
+                  </button>
+                  <div v-if="!article.preArticle" />
+                  <button
+                    v-if="article.nextArticle"
+                    class="cursor-pointer flex flex-col h-full text-right p-4 text-base font-medium text-[#557468] bg-white border border-gray-200 rounded-lg hover:border-[#3ecf9a] hover:bg-[#f0faf5] hover:text-[#3ecf9a] dark:bg-[#2c333e]/72 dark:border-[#334155] dark:text-[#cbd5e1] dark:hover:bg-[white/8] dark:hover:text-white transition-colors max-w-[48%] ml-auto"
+                    @click="router.push('/blog/surfer/article/' + article.nextArticle.articleId)"
+                  >
+                    <div>
+                      下一篇
+                      <RightOutlined class="inline w-3.5 h-3.5 ml-2 mb-1" />
+                    </div>
+                    <div class="line-clamp-1">{{ article.nextArticle.articleTitle }}</div>
+                  </button>
+                </nav>
+              </article>
+            </div>
+            <SurferComment />
+          </div>
+        </ACol>
+
+        <ACol v-show="desktopTocVisible && hasTocHeadings" :xs="0" :md="6">
+          <SurferToc :header-offset="150" />
+        </ACol>
+      </ARow>
+    </main>
+
+    <div
+      v-if="previewImageSrc"
+      class="article-image-preview"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="previewImageAlt"
+      @click.self="closeArticleImagePreview"
+    >
+      <button
+        class="article-image-preview-close"
+        type="button"
+        aria-label="关闭图片预览"
+        @click="closeArticleImagePreview"
+      >
+        ×
+      </button>
+      <img :src="previewImageSrc" :alt="previewImageAlt" class="article-image-preview-img" />
+    </div>
+
+    <ADrawer
+      v-model:open="mobileTocVisible"
+      title="文章目录"
+      placement="right"
+      width="86%"
+      class="article-mobile-toc-drawer"
+    >
+      <SurferToc
+        v-if="mobileTocVisible"
+        :key="mobileTocRenderKey"
+        :header-offset="80"
+        :pinnable="false"
+        @item-click="mobileTocVisible = false"
+      />
+    </ADrawer>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -591,251 +836,6 @@ onActivated(() => {
   pickHeroImage();
 });
 </script>
-
-<template>
-  <div>
-    <Slide :key="heroImageKey" :src="articleHeroImageSrc" :loading="!heroResolved" class="article-hero">
-      <template #skeleton>
-        <div class="article-hero-skeleton" aria-hidden="true">
-          <div class="article-hero-skeleton-cover"></div>
-          <div class="article-hero-skeleton-body">
-            <div class="article-hero-skeleton-line article-hero-skeleton-title"></div>
-            <div class="article-hero-skeleton-meta">
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-            <div class="article-hero-skeleton-info">
-              <span></span>
-              <span></span>
-              <span></span>
-              <span></span>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <div
-        class="article-hero-inner mx-auto flex h-full max-w-screen-2xl items-center justify-center px-4 text-white md:px-6"
-      >
-        <div v-if="loading" class="w-full max-w-3xl animate-pulse space-y-5 text-center">
-          <div class="mx-auto h-10 w-3/4 rounded-xl bg-white/20"></div>
-          <div class="mx-auto flex justify-center gap-3">
-            <div v-for="i in 3" :key="i" class="h-7 w-20 rounded-full bg-white/16"></div>
-          </div>
-          <div class="mx-auto flex justify-center gap-5">
-            <div v-for="i in 4" :key="i" class="h-5 w-24 rounded bg-white/12"></div>
-          </div>
-        </div>
-
-        <div
-          v-else-if="articleNotFound"
-          class="flex flex-col items-center justify-center text-center custom-text-shadow"
-        >
-          <div class="text-7xl font-black text-white/50">404</div>
-          <h2 class="mt-4 text-2xl font-bold text-white">文章不存在</h2>
-          <p class="mt-2 text-sm text-white/78">该文章可能已被删除或链接地址错误</p>
-          <RouterLink
-            to="/blog/surfer/home"
-            class="mt-6 inline-flex rounded-full bg-[#3ecf9a] px-6 py-2.5 text-sm font-semibold text-white hover:bg-[#15956b] dark:bg-[#539dfd] dark:hover:bg-[#8cc8ff]"
-          >
-            返回首页
-          </RouterLink>
-        </div>
-
-        <template v-else>
-          <div class="article-hero-content w-full max-w-5xl text-center custom-text-shadow md:-translate-y-8">
-            <h1
-              :key="article.title"
-              class="article-typing-title mb-5 text-3xl font-bold leading-tight text-white sm:mb-8 sm:text-4xl md:text-5xl"
-            >
-              <span class="article-typed-title-text">{{ typedArticleTitle }}</span>
-              <!--
-              -->
-              <span class="article-title-cursor">|</span>
-            </h1>
-
-            <div
-              v-if="article.tags && article.tags.length > 0"
-              class="mb-4 flex flex-wrap justify-center gap-2 sm:mb-5"
-            >
-              <ATooltip v-for="tag in article.tags" :key="tag.id" title="标签">
-                <button
-                  class="inline-flex cursor-pointer rounded-full bg-white/18 px-3 py-1 text-sm font-medium text-white backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:bg-white/26"
-                  @click="goTagArticleListPage(tag.id!, tag.name!)"
-                >
-                  # {{ tag.name }}
-                </button>
-              </ATooltip>
-            </div>
-
-            <div
-              class="mx-auto flex max-w-4xl flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-white/90 sm:gap-x-6 sm:gap-y-3 sm:text-sm"
-            >
-              <ATooltip title="分类">
-                <div class="flex items-center">
-                  <span class="hero-meta-icon bg-[#4fa759]"><FolderOutlined /></span>
-                  <button
-                    class="cursor-pointer hover:underline"
-                    @click="goCategoryArticleListPage(article.categoryId!, article.categoryName!)"
-                  >
-                    {{ article.categoryName }}
-                  </button>
-                </div>
-              </ATooltip>
-              <ATooltip title="发布时间">
-                <div class="flex items-center">
-                  <span class="hero-meta-icon bg-[#ea3b24]"><CalendarOutlined /></span>
-                  {{ formatDateTime(article.createTime) }}
-                </div>
-              </ATooltip>
-              <ATooltip title="阅读人次">
-                <div class="flex items-center">
-                  <span class="hero-meta-icon bg-[#f59e0b]"><EyeOutlined /></span>
-                  {{ article.readNum }}
-                </div>
-              </ATooltip>
-              <ATooltip title="总字数">
-                <div class="flex items-center">
-                  <span class="hero-meta-icon bg-[#a543e6]"><FileTextOutlined /></span>
-                  {{ article.totalWords }} 字
-                </div>
-              </ATooltip>
-              <ATooltip title="阅读耗时">
-                <div class="flex items-center">
-                  <span class="hero-meta-icon bg-[#5a9cf8]"><ClockCircleOutlined /></span>
-                  {{ article.readTime }}
-                </div>
-              </ATooltip>
-            </div>
-          </div>
-        </template>
-      </div>
-    </Slide>
-
-    <main class="mx-auto max-w-screen-2xl px-1 py-1 md:px-6">
-      <ARow :gutter="[28, 28]">
-        <ACol :xs="24" :md="desktopTocVisible && hasTocHeadings ? 18 : 24" class="min-h-0">
-          <div v-if="!loading && !articleNotFound && article.content" class="mb-3">
-            <div
-              class="rounded-lg border border-[#3ecf9a]/14 bg-white/84 p-2 mb-3 dark:border-[#334155] dark:bg-[#2c333e]/72"
-            >
-              <article>
-                <div>
-                  <div
-                    ref="articleContentRef"
-                    class="mt-5 leading-relaxed article-content"
-                    @click="handleArticleContentClick"
-                    v-html="renderedContent"
-                  ></div>
-                </div>
-
-                <div class="flex items-center text-sm mt-5 mb-5 text-[#557468] dark:text-[#cbd5e1]">
-                  <EditOutlined class="icon inline-block w-4 h-4 mr-1" />
-                  最后编辑于 {{ formatDateTime(article.updateTime) }}
-                </div>
-
-                <div class="mt-6 mb-6">
-                  <div
-                    class="flex items-start gap-3 p-4 rounded-xl border shadow-sm bg-[#f0faf5]/80 text-[#557468] border-[#3ecf9a]/14 dark:bg-[#2c333e]/60 dark:text-[#cbd5e1] dark:border-[#334155]"
-                  >
-                    <CopyrightOutlined class="w-5 h-5 text-[#3ecf9a] dark:text-[#539dfd] mt-0.5 shrink-0" />
-                    <div>
-                      <p class="text-sm font-bold uppercase tracking-wide text-[#557468] dark:text-[#cbd5e1] mb-1">
-                        版权声明
-                      </p>
-                      <p class="whitespace-pre-line text-sm leading-relaxed">
-                        {{ copyrightDeclaration }}
-                      </p>
-                      <div class="mt-2 text-xs flex items-start gap-1 text-[#557468] dark:text-[#cbd5e1]">
-                        <LinkOutlined class="mt-[2px] w-3.5 h-3.5 shrink-0" />
-                        <span class="text-sm shrink-0">原文链接：</span>
-                        <a
-                          :href="currentArticleUrl"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          class="text-sm text-[#3ecf9a] dark:text-[#539dfd] hover:underline break-all"
-                        >
-                          {{ currentArticleUrl }}
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <nav class="flex justify-between mt-7">
-                  <button
-                    v-if="article.preArticle"
-                    class="cursor-pointer flex flex-col h-full p-4 text-base font-medium text-[#557468] bg-white border border-gray-200 rounded-lg hover:border-[#3ecf9a] hover:bg-[#f0faf5] hover:text-[#3ecf9a] dark:bg-[#2c333e]/72 dark:border-[#334155] dark:text-[#cbd5e1] dark:hover:bg-[white/8] dark:hover:text-white transition-colors max-w-[48%]"
-                    @click="router.push('/blog/surfer/article/' + article.preArticle.articleId)"
-                  >
-                    <div>
-                      <LeftOutlined class="inline w-3.5 h-3.5 mr-2 mb-1" />
-                      上一篇
-                    </div>
-                    <div class="line-clamp-1">{{ article.preArticle.articleTitle }}</div>
-                  </button>
-                  <div v-if="!article.preArticle" />
-                  <button
-                    v-if="article.nextArticle"
-                    class="cursor-pointer flex flex-col h-full text-right p-4 text-base font-medium text-[#557468] bg-white border border-gray-200 rounded-lg hover:border-[#3ecf9a] hover:bg-[#f0faf5] hover:text-[#3ecf9a] dark:bg-[#2c333e]/72 dark:border-[#334155] dark:text-[#cbd5e1] dark:hover:bg-[white/8] dark:hover:text-white transition-colors max-w-[48%] ml-auto"
-                    @click="router.push('/blog/surfer/article/' + article.nextArticle.articleId)"
-                  >
-                    <div>
-                      下一篇
-                      <RightOutlined class="inline w-3.5 h-3.5 ml-2 mb-1" />
-                    </div>
-                    <div class="line-clamp-1">{{ article.nextArticle.articleTitle }}</div>
-                  </button>
-                </nav>
-              </article>
-            </div>
-            <SurferComment />
-          </div>
-        </ACol>
-
-        <ACol v-show="desktopTocVisible && hasTocHeadings" :xs="0" :md="6">
-          <SurferToc :header-offset="150" />
-        </ACol>
-      </ARow>
-    </main>
-
-    <div
-      v-if="previewImageSrc"
-      class="article-image-preview"
-      role="dialog"
-      aria-modal="true"
-      :aria-label="previewImageAlt"
-      @click.self="closeArticleImagePreview"
-    >
-      <button
-        class="article-image-preview-close"
-        type="button"
-        aria-label="关闭图片预览"
-        @click="closeArticleImagePreview"
-      >
-        ×
-      </button>
-      <img :src="previewImageSrc" :alt="previewImageAlt" class="article-image-preview-img" />
-    </div>
-
-    <ADrawer
-      v-model:open="mobileTocVisible"
-      title="文章目录"
-      placement="right"
-      width="86%"
-      class="article-mobile-toc-drawer"
-    >
-      <SurferToc
-        v-if="mobileTocVisible"
-        :key="mobileTocRenderKey"
-        :header-offset="80"
-        :pinnable="false"
-        @item-click="mobileTocVisible = false"
-      />
-    </ADrawer>
-  </div>
-</template>
 
 <style scoped>
 .article-hero-skeleton {

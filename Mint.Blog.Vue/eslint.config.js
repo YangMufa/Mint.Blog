@@ -4,6 +4,13 @@ const baseConfig = await defineConfig(
   { vue: true },
   {
     rules: {
+      'vue/block-order': [
+        'error',
+        {
+          order: ['template', 'script', 'style']
+        }
+      ],
+      'vue/order-in-components': 'off',
       'vue/multi-word-component-names': [
         'warn',
         {

@@ -1,53 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useFullscreen } from '@vueuse/core';
-import { GLOBAL_HEADER_MENU_ID } from '@/constants/app';
-import { getBlogSettingsDetail } from '@/service/blog/surfer/setting';
-import { useAppStore } from '@/store/system/app';
-import { useThemeStore } from '@/store/system/theme';
-import { useRouterPush } from '@/hooks/routing/use-router-push';
-import { $t } from '@/locales';
-import Breadcrumb from '@/layouts/frontdesk/breadcrumb.vue';
-import SurferSearchInput from '@/components/blog/surfer/search-input.vue';
-
-defineOptions({
-  name: 'SurferHeader'
-});
-
-interface Props {
-  showLogo?: App.Global.HeaderProps['showLogo'];
-  showMenuToggler?: App.Global.HeaderProps['showMenuToggler'];
-  showMenu?: App.Global.HeaderProps['showMenu'];
-}
-
-type Api<T> = { success: boolean; data: T };
-type Settings = { avatar?: string };
-
-defineProps<Props>();
-
-const appStore = useAppStore();
-const themeStore = useThemeStore();
-const { isFullscreen, toggle } = useFullscreen();
-const { routerPushByKey } = useRouterPush();
-const authorAvatar = ref<string>();
-
-function resolveImageUrl(url?: string) {
-  if (!url) return undefined;
-  if (/^(https?:|data:|blob:)/i.test(url)) return url;
-  return url.startsWith('/') ? url : `/${url}`;
-}
-
-onMounted(async () => {
-  try {
-    const res = await getBlogSettingsDetail<Api<Settings>>();
-    if (res.success) authorAvatar.value = resolveImageUrl(res.data?.avatar);
-  } catch {
-    authorAvatar.value = undefined;
-  }
-});
-
-</script>
-
 <template>
   <DarkModeContainer class="h-full flex items-center px-[8px] sm:px-[12px] shadow-header">
     <RouterLink
@@ -108,6 +58,56 @@ onMounted(async () => {
     </div>
   </DarkModeContainer>
 </template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue';
+import { useFullscreen } from '@vueuse/core';
+import { GLOBAL_HEADER_MENU_ID } from '@/constants/app';
+import { getBlogSettingsDetail } from '@/service/blog/surfer/setting';
+import { useAppStore } from '@/store/system/app';
+import { useThemeStore } from '@/store/system/theme';
+import { useRouterPush } from '@/hooks/routing/use-router-push';
+import { $t } from '@/locales';
+import Breadcrumb from '@/layouts/frontdesk/breadcrumb.vue';
+import SurferSearchInput from '@/components/blog/surfer/search-input.vue';
+
+defineOptions({
+  name: 'SurferHeader'
+});
+
+interface Props {
+  showLogo?: App.Global.HeaderProps['showLogo'];
+  showMenuToggler?: App.Global.HeaderProps['showMenuToggler'];
+  showMenu?: App.Global.HeaderProps['showMenu'];
+}
+
+type Api<T> = { success: boolean; data: T };
+type Settings = { avatar?: string };
+
+defineProps<Props>();
+
+const appStore = useAppStore();
+const themeStore = useThemeStore();
+const { isFullscreen, toggle } = useFullscreen();
+const { routerPushByKey } = useRouterPush();
+const authorAvatar = ref<string>();
+
+function resolveImageUrl(url?: string) {
+  if (!url) return undefined;
+  if (/^(https?:|data:|blob:)/i.test(url)) return url;
+  return url.startsWith('/') ? url : `/${url}`;
+}
+
+onMounted(async () => {
+  try {
+    const res = await getBlogSettingsDetail<Api<Settings>>();
+    if (res.success) authorAvatar.value = resolveImageUrl(res.data?.avatar);
+  } catch {
+    authorAvatar.value = undefined;
+  }
+});
+
+</script>
 
 <style scoped lang="scss">
 .header-blog-logo {

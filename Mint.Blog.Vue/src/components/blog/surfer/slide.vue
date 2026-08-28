@@ -1,30 +1,6 @@
-<script setup lang="ts">
-import Ripple from '@/components/blog/surfer/ripple.vue';
-import Starry from '@/components/blog/surfer/starry.vue';
-
-defineOptions({ name: 'SurferSlide' });
-
-withDefaults(
-  defineProps<{
-    src?: string;
-    fallbackSrc?: string;
-    loading?: boolean;
-    isRipple?: boolean;
-    isStarry?: boolean;
-  }>(),
-  {
-    src: '',
-    fallbackSrc: '',
-    loading: false,
-    isRipple: true,
-    isStarry: true
-  }
-);
-</script>
-
 <template>
   <div class="slide">
-    <div class="slide-inner">
+    <div class="slide-inner" :style="slideStyle">
       <div
         v-if="fallbackSrc"
         class="slide-background slide-background-fallback"
@@ -46,6 +22,40 @@ withDefaults(
     <Ripple v-if="isRipple" />
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed } from 'vue';
+import Ripple from '@/components/blog/surfer/ripple.vue';
+import Starry from '@/components/blog/surfer/starry.vue';
+
+defineOptions({ name: 'SurferSlide' });
+
+const props = withDefaults(
+  defineProps<{
+    src?: string;
+    fallbackSrc?: string;
+    loading?: boolean;
+    isRipple?: boolean;
+    isStarry?: boolean;
+    height?: string;
+    heightSm?: string;
+    heightMd?: string;
+  }>(),
+  {
+    src: '',
+    fallbackSrc: '',
+    loading: false,
+    isRipple: true,
+    isStarry: true
+  }
+);
+
+const slideStyle = computed(() => ({
+  '--slide-height': props.height,
+  '--slide-height-sm': props.heightSm,
+  '--slide-height-md': props.heightMd
+}));
+</script>
 
 <style scoped>
 .slide-inner {

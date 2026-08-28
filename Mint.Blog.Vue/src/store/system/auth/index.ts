@@ -74,7 +74,7 @@ export const useAuthStore = defineStore(SetupStoreId.Auth, () => {
 
     const redirectPath = router.currentRoute.value.query?.redirect;
 
-    if (typeof redirectPath === 'string' && redirectPath) {
+    if (typeof redirectPath === 'string' && redirectPath && !redirectPath.startsWith('/blog/surfer')) {
       return redirectPath;
     }
 
