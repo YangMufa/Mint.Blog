@@ -1,3 +1,7 @@
+<template>
+  <RouterView />
+</template>
+
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue';
 
@@ -120,7 +124,3 @@ onUnmounted(() => {
   window.removeEventListener('click', handleClick);
 });
 </script>
-
-<template>
-  <RouterView />
-</template>

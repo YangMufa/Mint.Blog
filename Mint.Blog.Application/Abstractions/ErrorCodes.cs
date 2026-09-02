@@ -40,6 +40,7 @@ public static class ErrorCodes {
 	public const string ColumnCoverInvalid = "column_cover_invalid";
 	public const string ColumnTitleDuplicate = "column_title_duplicate";
 	public const string ColumnCatalogArticleDuplicate = "column_catalog_article_duplicate";
+	public const string ColumnCatalogArticleOccupied = "column_catalog_article_occupied";
 	public const string FriendNameInvalid = "friend_name_invalid";
 	public const string FriendAvatarInvalid = "friend_avatar_invalid";
 	public const string FriendCategoryInvalid = "friend_category_invalid";

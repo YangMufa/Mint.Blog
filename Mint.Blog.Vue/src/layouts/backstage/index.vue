@@ -1,3 +1,137 @@
+<template>
+  <template v-if="blank">
+    <RouterView v-slot="{ Component, route }">
+      <Transition
+        :name="transitionName"
+        mode="out-in"
+        @before-leave="appStore.setContentXScrollable(true)"
+        @after-leave="resetScroll"
+        @after-enter="appStore.setContentXScrollable(false)"
+      >
+        <KeepAlive :include="routeStore.cacheRoutes" :exclude="routeStore.excludeCacheRoutes">
+          <component
+            :is="Component"
+            v-if="appStore.reloadFlag"
+            :key="tabStore.getTabIdByRoute(route)"
+            class="flex-grow bg-layout transition duration-300"
+            :class="{ 'p-[16px]': showPadding }"
+          />
+        </KeepAlive>
+      </Transition>
+    </RouterView>
+  </template>
+
+  <div v-else class="relative h-full" :class="commonClass" :style="cssVars">
+    <div
+      :id="isWrapperScroll ? scrollElId : undefined"
+      class="h-full flex flex-col"
+      :class="[commonClass, { 'overflow-y-auto': isWrapperScroll }]"
+    >
+      <template v-if="showHeader">
+        <header
+          v-show="!fullContent"
+          class="flex-shrink-0"
+          :class="[
+            $style['layout-header'],
+            commonClass,
+            headerLeftGapClass,
+            { 'absolute top-0 left-0 w-full': fixedHeaderAndTab }
+          ]"
+        >
+          <Header v-bind="headerProps" />
+        </header>
+        <div
+          v-show="!fullContent && fixedHeaderAndTab"
+          class="flex-shrink-0 overflow-hidden"
+          :class="$style['layout-header-placement']"
+        ></div>
+      </template>
+
+      <template v-if="showTab">
+        <div
+          class="flex-shrink-0"
+          :class="[
+            $style['layout-tab'],
+            commonClass,
+            { '!top-0': fullContent || !showHeader },
+            leftGapClass,
+            { 'absolute left-0 w-full': fixedHeaderAndTab }
+          ]"
+        >
+          <Tab />
+        </div>
+        <div
+          v-show="fullContent || fixedHeaderAndTab"
+          class="flex-shrink-0 overflow-hidden"
+          :class="$style['layout-tab-placement']"
+        ></div>
+      </template>
+
+      <template v-if="showSider">
+        <aside
+          v-show="!fullContent"
+          class="absolute left-0 top-0 h-full"
+          :class="[
+            commonClass,
+            siderPaddingClass,
+            appStore.siderCollapse ? $style['layout-sider_collapsed'] : $style['layout-sider']
+          ]"
+        >
+          <Sider />
+        </aside>
+      </template>
+
+      <template v-if="showMobileSider">
+        <aside
+          class="absolute left-0 top-0 h-full w-0 bg-white"
+          :class="[
+            commonClass,
+            $style['layout-mobile-sider'],
+            appStore.siderCollapse ? 'overflow-hidden' : $style['layout-sider']
+          ]"
+        >
+          <Sider />
+        </aside>
+        <div
+          v-show="!appStore.siderCollapse"
+          class="absolute left-0 top-0 h-full w-full bg-[rgba(0,0,0,0.2)]"
+          :class="$style['layout-mobile-sider-mask']"
+          @click="appStore.siderCollapse = true"
+        ></div>
+      </template>
+
+      <main
+        :id="isContentScroll ? scrollElId : undefined"
+        class="flex flex-col flex-grow"
+        :class="[commonClass, contentClass, leftGapClass, { 'overflow-y-auto': isContentScroll }]"
+      >
+        <Menu :key="menuRenderKey" />
+        <RouterView v-slot="{ Component, route }">
+          <Transition
+            :name="transitionName"
+            mode="out-in"
+            @before-leave="appStore.setContentXScrollable(true)"
+            @after-leave="resetScroll"
+            @after-enter="appStore.setContentXScrollable(false)"
+          >
+            <KeepAlive :include="routeStore.cacheRoutes" :exclude="routeStore.excludeCacheRoutes">
+              <component
+                :is="Component"
+                v-if="appStore.reloadFlag"
+                :key="tabStore.getTabIdByRoute(route)"
+                class="flex-grow bg-layout transition duration-300"
+                :class="{ 'p-[16px]': showPadding }"
+              />
+            </KeepAlive>
+          </Transition>
+        </RouterView>
+      </main>
+    </div>
+
+    <ThemeDrawer />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, ref, useCssModule, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -191,140 +325,6 @@ function resetScroll() {
   el?.scrollTo({ left: 0, top: 0 });
 }
 </script>
-
-<template>
-  <template v-if="blank">
-    <RouterView v-slot="{ Component, route }">
-      <Transition
-        :name="transitionName"
-        mode="out-in"
-        @before-leave="appStore.setContentXScrollable(true)"
-        @after-leave="resetScroll"
-        @after-enter="appStore.setContentXScrollable(false)"
-      >
-        <KeepAlive :include="routeStore.cacheRoutes" :exclude="routeStore.excludeCacheRoutes">
-          <component
-            :is="Component"
-            v-if="appStore.reloadFlag"
-            :key="tabStore.getTabIdByRoute(route)"
-            class="flex-grow bg-layout transition duration-300"
-            :class="{ 'p-[16px]': showPadding }"
-          />
-        </KeepAlive>
-      </Transition>
-    </RouterView>
-  </template>
-
-  <div v-else class="relative h-full" :class="commonClass" :style="cssVars">
-    <div
-      :id="isWrapperScroll ? scrollElId : undefined"
-      class="h-full flex flex-col"
-      :class="[commonClass, { 'overflow-y-auto': isWrapperScroll }]"
-    >
-      <template v-if="showHeader">
-        <header
-          v-show="!fullContent"
-          class="flex-shrink-0"
-          :class="[
-            $style['layout-header'],
-            commonClass,
-            headerLeftGapClass,
-            { 'absolute top-0 left-0 w-full': fixedHeaderAndTab }
-          ]"
-        >
-          <Header v-bind="headerProps" />
-        </header>
-        <div
-          v-show="!fullContent && fixedHeaderAndTab"
-          class="flex-shrink-0 overflow-hidden"
-          :class="$style['layout-header-placement']"
-        ></div>
-      </template>
-
-      <template v-if="showTab">
-        <div
-          class="flex-shrink-0"
-          :class="[
-            $style['layout-tab'],
-            commonClass,
-            { '!top-0': fullContent || !showHeader },
-            leftGapClass,
-            { 'absolute left-0 w-full': fixedHeaderAndTab }
-          ]"
-        >
-          <Tab />
-        </div>
-        <div
-          v-show="fullContent || fixedHeaderAndTab"
-          class="flex-shrink-0 overflow-hidden"
-          :class="$style['layout-tab-placement']"
-        ></div>
-      </template>
-
-      <template v-if="showSider">
-        <aside
-          v-show="!fullContent"
-          class="absolute left-0 top-0 h-full"
-          :class="[
-            commonClass,
-            siderPaddingClass,
-            appStore.siderCollapse ? $style['layout-sider_collapsed'] : $style['layout-sider']
-          ]"
-        >
-          <Sider />
-        </aside>
-      </template>
-
-      <template v-if="showMobileSider">
-        <aside
-          class="absolute left-0 top-0 h-full w-0 bg-white"
-          :class="[
-            commonClass,
-            $style['layout-mobile-sider'],
-            appStore.siderCollapse ? 'overflow-hidden' : $style['layout-sider']
-          ]"
-        >
-          <Sider />
-        </aside>
-        <div
-          v-show="!appStore.siderCollapse"
-          class="absolute left-0 top-0 h-full w-full bg-[rgba(0,0,0,0.2)]"
-          :class="$style['layout-mobile-sider-mask']"
-          @click="appStore.siderCollapse = true"
-        ></div>
-      </template>
-
-      <main
-        :id="isContentScroll ? scrollElId : undefined"
-        class="flex flex-col flex-grow"
-        :class="[commonClass, contentClass, leftGapClass, { 'overflow-y-auto': isContentScroll }]"
-      >
-        <Menu :key="menuRenderKey" />
-        <RouterView v-slot="{ Component, route }">
-          <Transition
-            :name="transitionName"
-            mode="out-in"
-            @before-leave="appStore.setContentXScrollable(true)"
-            @after-leave="resetScroll"
-            @after-enter="appStore.setContentXScrollable(false)"
-          >
-            <KeepAlive :include="routeStore.cacheRoutes" :exclude="routeStore.excludeCacheRoutes">
-              <component
-                :is="Component"
-                v-if="appStore.reloadFlag"
-                :key="tabStore.getTabIdByRoute(route)"
-                class="flex-grow bg-layout transition duration-300"
-                :class="{ 'p-[16px]': showPadding }"
-              />
-            </KeepAlive>
-          </Transition>
-        </RouterView>
-      </main>
-    </div>
-
-    <ThemeDrawer />
-  </div>
-</template>
 
 <style module>
 .layout-header,

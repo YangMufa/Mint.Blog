@@ -1,3 +1,118 @@
+<template>
+  <template v-if="blank">
+    <RouterView />
+  </template>
+
+  <div v-else class="relative h-full" :class="commonClass" :style="cssVars">
+    <div
+      :id="isWrapperScroll ? scrollElId : undefined"
+      class="h-full flex flex-col overscroll-contain"
+      :class="[commonClass, { 'overflow-y-auto': isWrapperScroll }]"
+    >
+      <template v-if="showHeader">
+        <header
+          v-show="!fullContent"
+          class="flex-shrink-0"
+          :class="[
+            $style['layout-header'],
+            commonClass,
+            headerLeftGapClass,
+            { 'absolute top-0 left-0 w-full': fixedHeaderAndTab }
+          ]"
+        >
+          <Header v-bind="headerProps" />
+        </header>
+        <div
+          v-show="!fullContent && fixedHeaderAndTab"
+          class="flex-shrink-0 overflow-hidden"
+          :class="$style['layout-header-placement']"
+        ></div>
+      </template>
+
+      <template v-if="showTab">
+        <div
+          class="flex-shrink-0"
+          :class="[
+            $style['layout-tab'],
+            commonClass,
+            { '!top-0': fullContent || !showHeader },
+            leftGapClass,
+            { 'absolute left-0 w-full': fixedHeaderAndTab }
+          ]"
+        >
+          <Tab />
+        </div>
+        <div
+          v-show="fullContent || fixedHeaderAndTab"
+          class="flex-shrink-0 overflow-hidden"
+          :class="$style['layout-tab-placement']"
+        ></div>
+      </template>
+
+      <template v-if="showSider">
+        <aside
+          v-show="!fullContent"
+          class="absolute left-0 top-0 h-full"
+          :class="[
+            commonClass,
+            siderPaddingClass,
+            appStore.siderCollapse ? $style['layout-sider_collapsed'] : $style['layout-sider']
+          ]"
+        >
+          <Sider />
+        </aside>
+      </template>
+
+      <template v-if="showMobileSider">
+        <aside
+          class="absolute left-0 top-0 h-full w-0 bg-white"
+          :class="[
+            commonClass,
+            $style['layout-mobile-sider'],
+            appStore.siderCollapse ? 'overflow-hidden' : $style['layout-sider']
+          ]"
+        >
+          <Sider />
+        </aside>
+        <div
+          v-show="!appStore.siderCollapse"
+          class="absolute left-0 top-0 h-full w-full bg-[rgba(0,0,0,0.2)]"
+          :class="$style['layout-mobile-sider-mask']"
+          @click="appStore.siderCollapse = true"
+        ></div>
+      </template>
+
+      <main
+        :id="isContentScroll ? scrollElId : undefined"
+        ref="mainRef"
+        class="flex flex-col flex-grow overflow-x-hidden overscroll-contain"
+        :class="[commonClass, contentClass, leftGapClass, { 'overflow-y-auto': isContentScroll }]"
+      >
+        <Menu :key="menuRenderKey" />
+        <div class="flex-1">
+          <RouterView />
+        </div>
+        <footer v-if="showFooter" v-show="!fullContent" class="flex-shrink-0" :class="commonClass">
+          <Footer />
+        </footer>
+      </main>
+
+      <FloatingTools v-show="!fullContent" />
+
+      <div
+        v-if="showFooter && !fullContent && footerAnimalsVisible"
+        class="fixed-footer-animals pointer-events-none fixed inset-x-0 bottom-0 z-[30] flex justify-center"
+      >
+        <div class="fixed-footer-animals-wrap mx-auto flex w-full max-w-[1200px] justify-center">
+          <img src="@/assets/blog/surfer/footer/animals.png" alt="" class="fixed-footer-animals-img" />
+        </div>
+      </div>
+    </div>
+
+    <ThemeDrawer />
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, useCssModule, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -277,121 +392,6 @@ const siderPaddingClass = computed(() => {
   return cls.trim();
 });
 </script>
-
-<template>
-  <template v-if="blank">
-    <RouterView />
-  </template>
-
-  <div v-else class="relative h-full" :class="commonClass" :style="cssVars">
-    <div
-      :id="isWrapperScroll ? scrollElId : undefined"
-      class="h-full flex flex-col overscroll-contain"
-      :class="[commonClass, { 'overflow-y-auto': isWrapperScroll }]"
-    >
-      <template v-if="showHeader">
-        <header
-          v-show="!fullContent"
-          class="flex-shrink-0"
-          :class="[
-            $style['layout-header'],
-            commonClass,
-            headerLeftGapClass,
-            { 'absolute top-0 left-0 w-full': fixedHeaderAndTab }
-          ]"
-        >
-          <Header v-bind="headerProps" />
-        </header>
-        <div
-          v-show="!fullContent && fixedHeaderAndTab"
-          class="flex-shrink-0 overflow-hidden"
-          :class="$style['layout-header-placement']"
-        ></div>
-      </template>
-
-      <template v-if="showTab">
-        <div
-          class="flex-shrink-0"
-          :class="[
-            $style['layout-tab'],
-            commonClass,
-            { '!top-0': fullContent || !showHeader },
-            leftGapClass,
-            { 'absolute left-0 w-full': fixedHeaderAndTab }
-          ]"
-        >
-          <Tab />
-        </div>
-        <div
-          v-show="fullContent || fixedHeaderAndTab"
-          class="flex-shrink-0 overflow-hidden"
-          :class="$style['layout-tab-placement']"
-        ></div>
-      </template>
-
-      <template v-if="showSider">
-        <aside
-          v-show="!fullContent"
-          class="absolute left-0 top-0 h-full"
-          :class="[
-            commonClass,
-            siderPaddingClass,
-            appStore.siderCollapse ? $style['layout-sider_collapsed'] : $style['layout-sider']
-          ]"
-        >
-          <Sider />
-        </aside>
-      </template>
-
-      <template v-if="showMobileSider">
-        <aside
-          class="absolute left-0 top-0 h-full w-0 bg-white"
-          :class="[
-            commonClass,
-            $style['layout-mobile-sider'],
-            appStore.siderCollapse ? 'overflow-hidden' : $style['layout-sider']
-          ]"
-        >
-          <Sider />
-        </aside>
-        <div
-          v-show="!appStore.siderCollapse"
-          class="absolute left-0 top-0 h-full w-full bg-[rgba(0,0,0,0.2)]"
-          :class="$style['layout-mobile-sider-mask']"
-          @click="appStore.siderCollapse = true"
-        ></div>
-      </template>
-
-      <main
-        :id="isContentScroll ? scrollElId : undefined"
-        ref="mainRef"
-        class="flex flex-col flex-grow overflow-x-hidden overscroll-contain"
-        :class="[commonClass, contentClass, leftGapClass, { 'overflow-y-auto': isContentScroll }]"
-      >
-        <Menu :key="menuRenderKey" />
-        <div class="flex-1">
-          <RouterView />
-        </div>
-        <footer v-if="showFooter" v-show="!fullContent" class="flex-shrink-0" :class="commonClass">
-          <Footer />
-        </footer>
-      </main>
-
-      <FloatingTools v-show="!fullContent" />
-
-      <div
-        v-if="showFooter && !fullContent && footerAnimalsVisible"
-        class="fixed-footer-animals pointer-events-none fixed inset-x-0 bottom-0 z-[30] flex justify-center"
-      >
-        <div class="fixed-footer-animals-wrap mx-auto flex w-full max-w-[1200px] justify-center">
-          <img src="@/assets/blog/surfer/footer/animals.png" alt="" class="fixed-footer-animals-img" />
-        </div>
-      </div>
-    </div>
-
-    <ThemeDrawer />
-  </div>
-</template>
 
 <style module>
 .layout-header,

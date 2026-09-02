@@ -1,110 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { CalendarOutlined, DownOutlined, FolderOutlined, UpOutlined } from '@ant-design/icons-vue';
-import { getCategoryArticlePageList, getCategoryList } from '@/service/blog/surfer/category';
-import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
-
-defineOptions({ name: 'SurferCategoryPage' });
-
-type Api<T> = { success: boolean; data: T };
-type CategoryItem = { id: number; name: string; articlesTotal: number; sort?: number };
-type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
-type PageResult = {
-  success: boolean;
-  data: ArticleItem[];
-  current: number;
-  size: number;
-  total: number;
-  pages: number;
-};
-
-const route = useRoute();
-const router = useRouter();
-
-const allCategories = ref<CategoryItem[]>([]);
-const articles = ref<ArticleItem[]>([]);
-const categoryName = ref((route.query.name as string) || '');
-const categoryId = ref((route.query.id as string) || '');
-const current = computed(() => {
-  const q = route.query.page;
-  const n = Number(q);
-  return Number.isFinite(n) && n > 0 ? n : 1;
-});
-const size = ref(10);
-const total = ref(0);
-const pages = ref(0);
-const loading = ref(false);
-const isMobileCategoryCollapsed = ref(true);
-
-function getCategoryArticles(pageNo: number) {
-  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
-  loading.value = true;
-  articles.value = [];
-  getCategoryArticlePageList<PageResult>({
-    current: pageNo,
-    size: size.value,
-    id: categoryId.value,
-    categoryId: categoryId.value
-  })
-    .then(res => {
-      if (res.success) {
-        articles.value = res.data;
-        size.value = res.size;
-        total.value = res.total;
-        pages.value = res.pages;
-      }
-    })
-    .catch(() => {
-      articles.value = [];
-      total.value = 0;
-      pages.value = 0;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-function goArticleDetailPage(articleId: number) {
-  router.push(`/blog/surfer/article/${articleId}`);
-}
-function goCategoryPage(id: number, name: string) {
-  isMobileCategoryCollapsed.value = true;
-  router.push({ path: '/blog/surfer/category', query: { id: String(id), name } });
-}
-function goPage(page: number) {
-  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
-}
-
-const byArticles = <T extends { id: number; articlesTotal?: number }>(list: T[]) =>
-  [...list].sort((a, b) => (b.articlesTotal || 0) - (a.articlesTotal || 0) || a.id - b.id);
-
-watch(route, newRoute => {
-  categoryName.value = (newRoute.query.name as string) || '';
-  categoryId.value = (newRoute.query.id as string) || '';
-  getCategoryArticles(current.value);
-});
-
-onMounted(async () => {
-  try {
-    const cats = await getCategoryList<Api<CategoryItem[]>>();
-    if (cats.success && cats.data?.length) {
-      const sorted = byArticles(cats.data.filter(category => category.articlesTotal > 0));
-      allCategories.value = sorted;
-      if (!categoryId.value && sorted.length > 0) {
-        const first = sorted[0];
-        await router.replace({ path: '/blog/surfer/category', query: { id: String(first.id), name: first.name } });
-        categoryId.value = String(first.id);
-        categoryName.value = first.name;
-      }
-    }
-  } catch {
-    allCategories.value = [];
-  }
-  getCategoryArticles(current.value);
-});
-</script>
-
 <template>
   <main class="mx-auto max-w-screen-2xl px-4 md:px-6 py-4">
     <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
@@ -234,6 +127,113 @@ onMounted(async () => {
     </div>
   </main>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { CalendarOutlined, DownOutlined, FolderOutlined, UpOutlined } from '@ant-design/icons-vue';
+import { getCategoryArticlePageList, getCategoryList } from '@/service/blog/surfer/category';
+import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
+
+defineOptions({ name: 'SurferCategoryPage' });
+
+type Api<T> = { success: boolean; data: T };
+type CategoryItem = { id: number; name: string; articlesTotal: number; sort?: number };
+type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
+type PageResult = {
+  success: boolean;
+  data: ArticleItem[];
+  current: number;
+  size: number;
+  total: number;
+  pages: number;
+};
+
+const route = useRoute();
+const router = useRouter();
+
+const allCategories = ref<CategoryItem[]>([]);
+const articles = ref<ArticleItem[]>([]);
+const categoryName = ref((route.query.name as string) || '');
+const categoryId = ref((route.query.id as string) || '');
+const current = computed(() => {
+  const q = route.query.page;
+  const n = Number(q);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+});
+const size = ref(10);
+const total = ref(0);
+const pages = ref(0);
+const loading = ref(false);
+const isMobileCategoryCollapsed = ref(true);
+
+function getCategoryArticles(pageNo: number) {
+  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
+  loading.value = true;
+  articles.value = [];
+  getCategoryArticlePageList<PageResult>({
+    current: pageNo,
+    size: size.value,
+    id: categoryId.value,
+    categoryId: categoryId.value
+  })
+    .then(res => {
+      if (res.success) {
+        articles.value = res.data;
+        size.value = res.size;
+        total.value = res.total;
+        pages.value = res.pages;
+      }
+    })
+    .catch(() => {
+      articles.value = [];
+      total.value = 0;
+      pages.value = 0;
+    })
+    .finally(() => {
+      loading.value = false;
+    });
+}
+
+function goArticleDetailPage(articleId: number) {
+  router.push(`/blog/surfer/article/${articleId}`);
+}
+function goCategoryPage(id: number, name: string) {
+  isMobileCategoryCollapsed.value = true;
+  router.push({ path: '/blog/surfer/category', query: { id: String(id), name } });
+}
+function goPage(page: number) {
+  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
+}
+
+const byArticles = <T extends { id: number; articlesTotal?: number }>(list: T[]) =>
+  [...list].sort((a, b) => (b.articlesTotal || 0) - (a.articlesTotal || 0) || a.id - b.id);
+
+watch(route, newRoute => {
+  categoryName.value = (newRoute.query.name as string) || '';
+  categoryId.value = (newRoute.query.id as string) || '';
+  getCategoryArticles(current.value);
+});
+
+onMounted(async () => {
+  try {
+    const cats = await getCategoryList<Api<CategoryItem[]>>();
+    if (cats.success && cats.data?.length) {
+      const sorted = byArticles(cats.data.filter(category => category.articlesTotal > 0));
+      allCategories.value = sorted;
+      if (!categoryId.value && sorted.length > 0) {
+        const first = sorted[0];
+        await router.replace({ path: '/blog/surfer/category', query: { id: String(first.id), name: first.name } });
+        categoryId.value = String(first.id);
+        categoryName.value = first.name;
+      }
+    }
+  } catch {
+    allCategories.value = [];
+  }
+  getCategoryArticles(current.value);
+});
+</script>
 
 <style scoped lang="scss">
 :global(html.dark) :deep(ol > li),

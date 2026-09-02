@@ -1,3 +1,50 @@
+<template>
+  <main class="column-page mx-auto min-h-screen max-w-screen-2xl bg-layout px-4 py-4 md:px-6" :class="pageClass">
+    <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
+      <div class="col-span-1 mt-0 mb-3 lg:col-span-3 lg:mt-2">
+        <div class="column-content">
+          <div v-if="loading" class="column-grid">
+            <article v-for="i in 6" :key="i" class="column-card skeleton-card">
+              <div class="column-cover skeleton-cover"></div>
+              <div class="column-info">
+                <div class="skeleton-line title"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+              </div>
+            </article>
+          </div>
+
+          <div v-else-if="!columns.length" class="empty-box">
+            <div>📚</div>
+            <p>暂无专栏</p>
+          </div>
+
+          <div v-else class="column-grid">
+            <article v-for="column in columns" :key="column.id" class="column-card" @click="goColumnDetail(column.id)">
+              <div class="column-cover">
+                <img v-if="shouldShowCover(column)" :src="column.cover || ''" alt="" loading="lazy" @error="markCoverFailed(column.id)" />
+                <div v-else class="cover-placeholder"><BookOutlined /></div>
+                <span v-if="column.isTop" class="top-badge">置顶</span>
+                <div class="card-actions">
+                  <button type="button"><ReadOutlined /> 查看专栏</button>
+                </div>
+              </div>
+              <div class="column-info">
+                <h3>{{ column.title }}</h3>
+                <p>{{ column.summary || '暂无简介' }}</p>
+              </div>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-1 mt-0 mb-3 lg:mt-2">
+        <SurferSidebar class="lg:!top-2" hide-columns />
+      </div>
+    </div>
+  </main>
+</template>
+
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -71,53 +118,6 @@ onMounted(async () => {
   }
 });
 </script>
-
-<template>
-  <main class="column-page mx-auto min-h-screen max-w-screen-2xl bg-layout px-4 py-4 md:px-6" :class="pageClass">
-    <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
-      <div class="col-span-1 mt-0 mb-3 lg:col-span-3 lg:mt-2">
-        <div class="column-content">
-          <div v-if="loading" class="column-grid">
-            <article v-for="i in 6" :key="i" class="column-card skeleton-card">
-              <div class="column-cover skeleton-cover"></div>
-              <div class="column-info">
-                <div class="skeleton-line title"></div>
-                <div class="skeleton-line"></div>
-                <div class="skeleton-line short"></div>
-              </div>
-            </article>
-          </div>
-
-          <div v-else-if="!columns.length" class="empty-box">
-            <div>📚</div>
-            <p>暂无专栏</p>
-          </div>
-
-          <div v-else class="column-grid">
-            <article v-for="column in columns" :key="column.id" class="column-card" @click="goColumnDetail(column.id)">
-              <div class="column-cover">
-                <img v-if="shouldShowCover(column)" :src="column.cover || ''" alt="" loading="lazy" @error="markCoverFailed(column.id)" />
-                <div v-else class="cover-placeholder"><BookOutlined /></div>
-                <span v-if="column.isTop" class="top-badge">置顶</span>
-                <div class="card-actions">
-                  <button type="button"><ReadOutlined /> 查看专栏</button>
-                </div>
-              </div>
-              <div class="column-info">
-                <h3>{{ column.title }}</h3>
-                <p>{{ column.summary || '暂无简介' }}</p>
-              </div>
-            </article>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-span-1 mt-0 mb-3 lg:mt-2">
-        <SurferSidebar class="lg:!top-2" hide-columns />
-      </div>
-    </div>
-  </main>
-</template>
 
 <style scoped lang="scss">
 .column-page {

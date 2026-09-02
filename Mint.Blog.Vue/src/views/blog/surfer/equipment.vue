@@ -1,3 +1,74 @@
+<template>
+  <main class="equipment-page mx-auto max-w-screen-xl px-4 py-4 md:px-6" :class="pageClass">
+    <div class="mt-10 mb-3">
+        <section class="hero panel">
+          <div>
+            <p class="eyebrow">Equipment</p>
+            <h1>我的开发装备</h1>
+            <p class="hero-desc">这里记录日常开发、写博客、调试服务和折腾项目时使用的设备与软件环境。装备不一定昂贵，稳定、顺手、能持续输出才最重要。</p>
+            <div class="hero-tags">
+              <span><ThunderboltOutlined /> 高效开发</span>
+              <span><RocketOutlined /> 快速交付</span>
+            </div>
+          </div>
+          <div class="screen-card">
+            <div class="screen-dot"><i></i><i></i><i></i></div>
+            <b></b><b></b><b></b>
+            <div class="terminal">pnpm run dev</div>
+          </div>
+        </section>
+
+        <section class="summary-grid">
+          <div v-for="item in summary" :key="item.label" class="summary-card panel">
+            <span>{{ item.label }}</span>
+            <strong>{{ item.value }}</strong>
+          </div>
+        </section>
+
+        <section class="panel section-panel">
+          <div class="section-title">
+            <i></i>
+            <div>
+              <h2>硬件设备</h2>
+              <p>从主力开发机到扩展外设，组成一套适合日常编码的工作台。</p>
+            </div>
+          </div>
+          <div class="equipment-grid">
+            <article v-for="item in equipments" :key="item.name" class="device-card" :style="{ '--accent': item.accent }">
+              <div class="card-head">
+                <div class="device-icon"><component :is="item.icon" /></div>
+                <div><small>{{ item.category }}</small><h3>{{ item.name }}</h3></div>
+              </div>
+              <p>{{ item.description }}</p>
+              <ul><li v-for="spec in item.specs" :key="spec">{{ spec }}</li></ul>
+              <div class="tag-list"><span v-for="tag in item.tags" :key="tag"># {{ tag }}</span></div>
+            </article>
+          </div>
+        </section>
+
+        <div class="bottom-grid">
+          <section class="panel section-panel">
+            <div class="section-title compact"><i></i><h2>使用场景</h2></div>
+            <div class="workflow-list">
+              <div v-for="item in workflows" :key="item.title" class="workflow-item">
+                <div class="workflow-icon"><component :is="item.icon" /></div>
+                <div><h3>{{ item.title }}</h3><p>{{ item.desc }}</p></div>
+              </div>
+            </div>
+          </section>
+          <section class="panel section-panel">
+            <div class="section-title compact"><i></i><h2>软件环境</h2></div>
+            <div class="software-grid">
+              <div v-for="item in softwareStack" :key="item.title" class="software-item">
+                <strong>{{ item.title }}</strong><span>{{ item.desc }}</span>
+              </div>
+            </div>
+          </section>
+        </div>
+    </div>
+  </main>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ApiOutlined, AppleOutlined, CodeOutlined, DesktopOutlined, LaptopOutlined, RocketOutlined, ThunderboltOutlined, ToolOutlined } from '@ant-design/icons-vue';
@@ -84,77 +155,6 @@ const softwareStack: SimpleItem[] = [
   { title: 'Git', desc: '版本管理' }
 ];
 </script>
-
-<template>
-  <main class="equipment-page mx-auto max-w-screen-xl px-4 py-4 md:px-6" :class="pageClass">
-    <div class="mt-10 mb-3">
-        <section class="hero panel">
-          <div>
-            <p class="eyebrow">Equipment</p>
-            <h1>我的开发装备</h1>
-            <p class="hero-desc">这里记录日常开发、写博客、调试服务和折腾项目时使用的设备与软件环境。装备不一定昂贵，稳定、顺手、能持续输出才最重要。</p>
-            <div class="hero-tags">
-              <span><ThunderboltOutlined /> 高效开发</span>
-              <span><RocketOutlined /> 快速交付</span>
-            </div>
-          </div>
-          <div class="screen-card">
-            <div class="screen-dot"><i></i><i></i><i></i></div>
-            <b></b><b></b><b></b>
-            <div class="terminal">pnpm run dev</div>
-          </div>
-        </section>
-
-        <section class="summary-grid">
-          <div v-for="item in summary" :key="item.label" class="summary-card panel">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </section>
-
-        <section class="panel section-panel">
-          <div class="section-title">
-            <i></i>
-            <div>
-              <h2>硬件设备</h2>
-              <p>从主力开发机到扩展外设，组成一套适合日常编码的工作台。</p>
-            </div>
-          </div>
-          <div class="equipment-grid">
-            <article v-for="item in equipments" :key="item.name" class="device-card" :style="{ '--accent': item.accent }">
-              <div class="card-head">
-                <div class="device-icon"><component :is="item.icon" /></div>
-                <div><small>{{ item.category }}</small><h3>{{ item.name }}</h3></div>
-              </div>
-              <p>{{ item.description }}</p>
-              <ul><li v-for="spec in item.specs" :key="spec">{{ spec }}</li></ul>
-              <div class="tag-list"><span v-for="tag in item.tags" :key="tag"># {{ tag }}</span></div>
-            </article>
-          </div>
-        </section>
-
-        <div class="bottom-grid">
-          <section class="panel section-panel">
-            <div class="section-title compact"><i></i><h2>使用场景</h2></div>
-            <div class="workflow-list">
-              <div v-for="item in workflows" :key="item.title" class="workflow-item">
-                <div class="workflow-icon"><component :is="item.icon" /></div>
-                <div><h3>{{ item.title }}</h3><p>{{ item.desc }}</p></div>
-              </div>
-            </div>
-          </section>
-          <section class="panel section-panel">
-            <div class="section-title compact"><i></i><h2>软件环境</h2></div>
-            <div class="software-grid">
-              <div v-for="item in softwareStack" :key="item.title" class="software-item">
-                <strong>{{ item.title }}</strong><span>{{ item.desc }}</span>
-              </div>
-            </div>
-          </section>
-        </div>
-    </div>
-  </main>
-</template>
 
 <style scoped lang="scss">
 .equipment-page { color: #0d3d2d; background-color: rgb(var(--layout-bg-color)); }

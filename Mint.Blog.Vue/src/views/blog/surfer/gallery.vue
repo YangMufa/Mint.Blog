@@ -1,3 +1,43 @@
+<template>
+  <main class="gallery-page mx-auto max-w-screen-2xl px-4 py-0 md:px-6" :class="pageClass">
+    <section class="filter-panel" :class="{ collapsed: !filterExpanded }">
+      <button class="filter-toggle" type="button" @click="filterExpanded = !filterExpanded">{{ filterExpanded ? '收起筛选' : '展开筛选' }}</button>
+      <div class="filter-row">
+        <AInput v-model:value="searchKeyword" allow-clear placeholder="搜索图片名称"><template #prefix><SearchOutlined /></template></AInput>
+        <ASelect v-model:value="activeCategory" class="filter-select"><ASelectOption value="all">全部分类（{{ galleryImages.length }}）</ASelectOption><ASelectOption v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}（{{ getCategoryCount(item.id) }}）</ASelectOption></ASelect>
+        <ASelect v-model:value="activeResolution" class="filter-select"><ASelectOption value="all">全部分辨率</ASelectOption><ASelectOption v-for="item in resolutions" :key="item" :value="item">{{ item }}</ASelectOption></ASelect>
+        <ASelect v-model:value="activeRatio" class="filter-select"><ASelectOption value="all">全部比例</ASelectOption><ASelectOption v-for="item in ratios" :key="item" :value="item">{{ item }}</ASelectOption></ASelect>
+        <div class="sort-box"><SortAscendingOutlined /><select v-model="sortType" @change="loadGallery"><option value="timeDesc">时间最新</option><option value="timeAsc">时间最早</option><option value="nameAsc">名称 A-Z</option><option value="nameDesc">名称 Z-A</option></select></div>
+      </div>
+      <p class="copyright-notice">声明：如有侵权，请联系 yanggongzi@163.com，我会尽快删除。</p>
+    </section>
+    <section class="image-panel"><div class="toolbar"><div><h2>{{ activeCategoryName }}</h2><p>共 {{ filteredImages.length }} 张图片</p></div></div>
+      <div v-if="loading" class="empty-state">正在加载图片...</div>
+      <div v-else-if="!filteredImages.length" class="empty-state">暂无匹配图片</div>
+      <div v-else class="image-grid">
+        <article v-for="image in filteredImages" :key="image.id" class="image-card">
+          <div class="image-cover" role="button" tabindex="0" @click="openPreview(image)" @keydown.enter="openPreview(image)">
+            <img :src="image.url" :alt="image.name" loading="lazy" />
+          </div>
+          <div class="image-info">
+            <h3>{{ image.name }}</h3>
+          <div class="meta-row">
+            <span>{{ image.categoryName }}</span>
+            <span>{{ image.resolution }}</span>
+            <span>{{ formatRatio(image.ratio) }}</span>
+            <a class="download-action" :href="image.url" target="_blank" rel="noopener noreferrer" :download="image.name" @click.stop>
+              <DownloadOutlined />下载({{ image.size }}M)
+            </a>
+          </div>
+          <p><CalendarOutlined /> {{ image.time || '未设置时间' }}</p>
+        </div>
+      </article>
+    </div>
+    </section>
+    <AModal v-model:open="previewOpen" centered :footer="null" width="min(92vw, 980px)" :title="previewImage?.name"><img v-if="previewImage" class="preview-img" :src="previewImage.url" :alt="previewImage.name" /></AModal>
+  </main>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
 import { CalendarOutlined, DownloadOutlined, SearchOutlined, SortAscendingOutlined } from '@ant-design/icons-vue';
@@ -89,46 +129,6 @@ function formatRatio(ratio: string) {
 function openPreview(image: GalleryImageItem) { previewImage.value = image; previewOpen.value = true; }
 onMounted(loadGallery);
 </script>
-
-<template>
-  <main class="gallery-page mx-auto max-w-screen-2xl px-4 py-0 md:px-6" :class="pageClass">
-    <section class="filter-panel" :class="{ collapsed: !filterExpanded }">
-      <button class="filter-toggle" type="button" @click="filterExpanded = !filterExpanded">{{ filterExpanded ? '收起筛选' : '展开筛选' }}</button>
-      <div class="filter-row">
-        <AInput v-model:value="searchKeyword" allow-clear placeholder="搜索图片名称"><template #prefix><SearchOutlined /></template></AInput>
-        <ASelect v-model:value="activeCategory" class="filter-select"><ASelectOption value="all">全部分类（{{ galleryImages.length }}）</ASelectOption><ASelectOption v-for="item in categories" :key="item.id" :value="item.id">{{ item.name }}（{{ getCategoryCount(item.id) }}）</ASelectOption></ASelect>
-        <ASelect v-model:value="activeResolution" class="filter-select"><ASelectOption value="all">全部分辨率</ASelectOption><ASelectOption v-for="item in resolutions" :key="item" :value="item">{{ item }}</ASelectOption></ASelect>
-        <ASelect v-model:value="activeRatio" class="filter-select"><ASelectOption value="all">全部比例</ASelectOption><ASelectOption v-for="item in ratios" :key="item" :value="item">{{ item }}</ASelectOption></ASelect>
-        <div class="sort-box"><SortAscendingOutlined /><select v-model="sortType" @change="loadGallery"><option value="timeDesc">时间最新</option><option value="timeAsc">时间最早</option><option value="nameAsc">名称 A-Z</option><option value="nameDesc">名称 Z-A</option></select></div>
-      </div>
-      <p class="copyright-notice">声明：如有侵权，请联系 yanggongzi@163.com，我会尽快删除。</p>
-    </section>
-    <section class="image-panel"><div class="toolbar"><div><h2>{{ activeCategoryName }}</h2><p>共 {{ filteredImages.length }} 张图片</p></div></div>
-      <div v-if="loading" class="empty-state">正在加载图片...</div>
-      <div v-else-if="!filteredImages.length" class="empty-state">暂无匹配图片</div>
-      <div v-else class="image-grid">
-        <article v-for="image in filteredImages" :key="image.id" class="image-card">
-          <div class="image-cover" role="button" tabindex="0" @click="openPreview(image)" @keydown.enter="openPreview(image)">
-            <img :src="image.url" :alt="image.name" loading="lazy" />
-          </div>
-          <div class="image-info">
-            <h3>{{ image.name }}</h3>
-          <div class="meta-row">
-            <span>{{ image.categoryName }}</span>
-            <span>{{ image.resolution }}</span>
-            <span>{{ formatRatio(image.ratio) }}</span>
-            <a class="download-action" :href="image.url" target="_blank" rel="noopener noreferrer" :download="image.name" @click.stop>
-              <DownloadOutlined />下载({{ image.size }}M)
-            </a>
-          </div>
-          <p><CalendarOutlined /> {{ image.time || '未设置时间' }}</p>
-        </div>
-      </article>
-    </div>
-    </section>
-    <AModal v-model:open="previewOpen" centered :footer="null" width="min(92vw, 980px)" :title="previewImage?.name"><img v-if="previewImage" class="preview-img" :src="previewImage.url" :alt="previewImage.name" /></AModal>
-  </main>
-</template>
 
 <style scoped lang="scss">
 .gallery-page { color: #0d3d2d; background-color: rgb(var(--layout-bg-color)); }.filter-panel,.image-panel { border: 1px solid rgb(62 207 154 / 42%); border-radius: 28px; background: rgb(255 255 255 / 88%); box-shadow: 0 8px 28px rgb(15 23 42 / 7%); }.filter-panel { position: sticky; top: 22px; z-index: 10; margin-top: 22px; padding: 18px; backdrop-filter: blur(14px); }.filter-toggle { display:none; }.panel-title { display:flex; gap:8px; margin-bottom:14px; font-weight:950; }.filter-row { display:flex; flex-wrap:wrap; gap:12px; }.filter-row :deep(.ant-input-affix-wrapper) { width:240px; }.filter-select { min-width:160px; }.filter-select :deep(.ant-select-selector) { height: 38px !important; align-items: center; border-radius: 999px !important; }.sort-box { display:inline-flex; height:38px; box-sizing:border-box; align-items:center; gap:8px; padding:8px 13px; border:1px solid rgb(62 207 154 / 30%); border-radius:999px; color:#15956b; }.sort-box select { border:0; outline:0; background:transparent; color:#15956b; font-weight:900; }.copyright-notice { position:absolute; top:18px; right:18px; max-width:420px; margin:0; color:#7a8f87; font-size:12px; line-height:1.6; white-space:normal; overflow-wrap:anywhere; text-align:right; }.image-panel { margin-top:22px; padding:22px; }.toolbar h2 { margin:0; font-size:24px; font-weight:950; }.toolbar p { margin:5px 0 20px; color:#6b8078; }.image-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }.image-card { overflow:hidden; border:1px solid rgb(15 61 45 / 8%); border-radius:24px; background:#fff; }.image-cover { position:relative; aspect-ratio:16/10; overflow:hidden; background:#eefbf6; cursor:pointer; }.image-cover img { width:100%; height:100%; object-fit:cover; }.image-info { padding:7.5px 15px; }.image-info h3 { margin:0; font-size:16px; }.meta-row { display:flex; flex-wrap:wrap; align-items:center; gap:7px; margin-top:0; }.meta-row span { border-radius:999px; padding:5px 9px; background:#e9faf3; color:#15956b; font-size:12px; }.download-action { display:inline-flex; align-items:center; gap:5px; margin-left:auto; padding:5px 9px; border:1px solid rgb(62 207 154 / 30%); border-radius:999px; background:#fff; color:#0d3d2d; font-size:12px; text-decoration:none; }.image-info p { display:flex; gap:6px; margin:0; color:#6b8078; font-size:12px; }.empty-state { padding:80px 0; text-align:center; color:#6b8078; }.preview-img { display:block; width:100%; max-height:76vh; object-fit:contain; border-radius:16px; }

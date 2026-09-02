@@ -1,3 +1,197 @@
+<template>
+  <Slide :key="swiperImageKey" :src="slideImageSrc" :loading="!bannerResolved" class="slide-hero">
+    <template #skeleton>
+      <div class="banner-skeleton" aria-hidden="true">
+        <div class="banner-skeleton-cover"></div>
+        <div class="banner-skeleton-body">
+          <div class="banner-skeleton-line banner-skeleton-title"></div>
+          <div class="banner-skeleton-line banner-skeleton-summary"></div>
+          <div class="banner-skeleton-line banner-skeleton-summary-short"></div>
+        </div>
+      </div>
+    </template>
+    <Typed
+      :texts="displayTexts"
+      class="absolute top-1/2 sm:top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 sm:-translate-y-1/2 w-[80%] text-center text-white text-xl sm:text-[30px] leading-7 sm:leading-[40px] md:leading-[50px]"
+      style="text-shadow: 0 2px 8px rgba(0,0,0,0.4)"
+    />
+  </Slide>
+
+  <main class="mx-auto max-w-screen-xl px-4 py-0 md:px-6 pb-10 sm:pb-20">
+    <ARow :gutter="[{ xs: 0, sm: 16, md: 28 }, 28]">
+      <!-- ---- Article List (Left) ---- -->
+      <ACol :xs="24" :lg="17">
+        <section class="mt-0 space-y-4 md:mt-0">
+          <!-- Loading skeleton -->
+          <div v-if="loading" class="space-y-4">
+            <article v-for="i in 4" :key="i" class="home-skeleton-card">
+              <div class="home-skeleton-cover"></div>
+              <div class="home-skeleton-body">
+                <div class="home-skeleton-line home-skeleton-title"></div>
+                <div class="home-skeleton-line home-skeleton-summary"></div>
+                <div class="home-skeleton-line home-skeleton-summary-short"></div>
+                <div class="home-skeleton-meta">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <div class="home-skeleton-tags">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- Empty state -->
+          <div v-else-if="!articles.length" class="empty-card min-h-[310px]">
+            <div class="empty-icon">M</div>
+            <h2 class="mt-5 text-2xl font-black text-[#0d3d2d] dark:text-white">
+              还没有发布文章
+            </h2>
+            <p
+              class="mt-3 max-w-md text-center text-sm leading-7 text-[#60786e] dark:text-[#cbd5e1]"
+            >
+              数据准备好后，文章会以图文卡片的形式展示在这里。你也可以先浏览分类、标签或专栏内容。
+            </p>
+            <div class="mt-6 flex flex-wrap justify-center gap-2">
+              <span class="tag-pill">Mint Blog</span>
+              <span class="tag-pill">Fresh Reading</span>
+              <span class="tag-pill">Coming Soon</span>
+            </div>
+          </div>
+
+          <!-- ====== Card Layout ====== -->
+          <template v-else>
+            <article
+              v-for="(a, i) in articles"
+              :key="a.id"
+              class="card group relative flex min-h-[154px] overflow-hidden sm:min-h-[190px] md:h-[200px] lg:h-[190px] xl:h-[220px]"
+            >
+              <img
+                v-if="isValidUrl(a.cover)"
+                :src="a.cover!"
+                class="hidden"
+                @error="onCoverError(a.id)"
+              />
+              <button class="mobile-cover sm:hidden" @click="goArticle(a.id)">
+                <span :style="cover(a)"></span>
+              </button>
+              <button v-if="i % 2 === 0" class="cover left-cover" @click="goArticle(a.id)">
+                <span :style="cover(a)"></span>
+              </button>
+              <div
+                class="relative z-10 flex min-w-0 flex-1 flex-col justify-center py-4 pl-3 pr-[14px] text-left sm:w-[64%] sm:justify-between sm:p-5 sm:px-8 lg:px-6 xl:px-10"
+              >
+                <div class="min-w-0 cursor-pointer" @click="goArticle(a.id)">
+                  <div
+                    class="mb-2 flex items-center justify-between gap-2 sm:hidden"
+                    :class="{ 'pr-[0px]': a.isTop }"
+                  >
+                    <ATooltip title="标签">
+                      <button
+                        class="mobile-category-pill"
+                        :disabled="!primaryTag(a)"
+                        @click.stop="primaryTag(a) && goTag(primaryTag(a)!.id, primaryTag(a)!.name)"
+                      >
+                        #&nbsp;{{ primaryTag(a)?.name || '无标签' }}
+                      </button>
+                    </ATooltip>
+                    <span class="mobile-date">{{ formatDate(getArticleDisplayTime(a)) }}</span>
+                  </div>
+                  <h2
+                    class="line-clamp-1 text-[18px] font-black leading-7 text-[#0d3d2d] hover:text-[#3ecf9a] dark:text-white dark:hover:text-[#539dfd] sm:text-xl md:text-2xl"
+                  >
+                    {{ a.title }}
+                  </h2>
+                  <p
+                    class="mt-1 line-clamp-1 text-[14px] font-semibold leading-6 text-[#60786e] dark:text-[#cbd5e1] sm:mt-3 sm:line-clamp-2 sm:text-sm sm:leading-7 sm:indent-8 xl:line-clamp-3"
+                  >
+                    {{ info(a) }}
+                  </p>
+                </div>
+                <div>
+                  <div
+                    class="mt-2 flex flex-wrap items-center justify-start gap-3 text-[13px] text-[#8aa093] sm:mt-4 sm:justify-start sm:text-xs"
+                  >
+                    <ATooltip title="分类">
+                      <button
+                        class="inline-flex cursor-pointer items-center gap-1"
+                        @click.stop="goCategory(a.category?.id, a.category?.name)"
+                      >
+                        <span class="meta-icon meta-icon-category">
+                          <FolderOutlined />
+                        </span>
+                        {{ a.category?.name || '未分类' }}
+                      </button>
+                    </ATooltip>
+                    <ATooltip title="阅读量">
+                      <span class="inline-flex cursor-default items-center gap-1">
+                        <span class="meta-icon meta-icon-read">
+                          <EyeOutlined />
+                        </span>
+                        {{ views(a, i) }}
+                      </span>
+                    </ATooltip>
+                    <ATooltip title="发布时间">
+                      <span class="hidden cursor-default items-center gap-1 sm:inline-flex">
+                        <span class="meta-icon meta-icon-time">
+                          <CalendarOutlined />
+                        </span>
+                        {{ formatDate(getArticleDisplayTime(a)) }}
+                      </span>
+                    </ATooltip>
+                  </div>
+                  <div class="mt-3 hidden flex-wrap justify-center gap-2 sm:flex sm:justify-start">
+                    <ATooltip v-for="tag in (a.tags || []).slice(0, 4)" :key="tag.id" title="标签">
+                      <button
+                        class="tag"
+                        @click.stop="goTag(tag.id, tag.name)"
+                      >
+                      #&nbsp;{{ tag.name }}
+                      </button>
+                    </ATooltip>
+                  </div>
+                </div>
+              </div>
+              <div
+                class="card-cover-glow absolute inset-0 bg-cover bg-center opacity-20 blur-3xl dark:opacity-14"
+                :style="cover(a)"
+              ></div>
+              <button v-if="i % 2 !== 0" class="cover right-cover" @click="goArticle(a.id)">
+                <span :style="cover(a)"></span>
+              </button>
+              <div
+                v-if="a.isTop"
+                class="top-badge absolute z-30 rounded-full bg-gradient-to-r from-[#ff6b6b] to-[#ef4444] px-3 py-1 text-xs font-black text-white shadow-lg shadow-red-500/20"
+              >
+                置顶
+              </div>
+            </article>
+          </template>
+
+          <!-- Pagination -->
+          <div v-if="pages > 0" class="surfer-pagination flex justify-center pt-0">
+            <APagination
+              :current="current"
+              :page-size="size"
+              :total="total"
+              :show-size-changer="false"
+              @change="goPage"
+            />
+          </div>
+        </section>
+      </ACol>
+
+      <!-- ---- Sidebar (Right) ---- -->
+      <ACol :xs="24" :lg="7" class="mt-0 lg:mt-0">
+        <SidebarRight />
+      </ACol>
+    </ARow>
+  </main>
+</template>
+
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -223,200 +417,6 @@ onBeforeUnmount(() => {
   stopBannerPreload();
 });
 </script>
-
-<template>
-  <Slide :key="swiperImageKey" :src="slideImageSrc" :loading="!bannerResolved" class="slide-hero">
-    <template #skeleton>
-      <div class="banner-skeleton" aria-hidden="true">
-        <div class="banner-skeleton-cover"></div>
-        <div class="banner-skeleton-body">
-          <div class="banner-skeleton-line banner-skeleton-title"></div>
-          <div class="banner-skeleton-line banner-skeleton-summary"></div>
-          <div class="banner-skeleton-line banner-skeleton-summary-short"></div>
-        </div>
-      </div>
-    </template>
-    <Typed
-      :texts="displayTexts"
-      class="absolute top-1/2 sm:top-[48%] left-1/2 -translate-x-1/2 -translate-y-1/2 sm:-translate-y-1/2 w-[80%] text-center text-white text-xl sm:text-[30px] leading-7 sm:leading-[40px] md:leading-[50px]"
-      style="text-shadow: 0 2px 8px rgba(0,0,0,0.4)"
-    />
-  </Slide>
-
-  <main class="mx-auto max-w-screen-xl px-4 py-0 md:px-6 pb-10 sm:pb-20">
-    <ARow :gutter="[{ xs: 0, sm: 16, md: 28 }, 28]">
-      <!-- ---- Article List (Left) ---- -->
-      <ACol :xs="24" :lg="17">
-        <section class="mt-0 space-y-4 md:mt-0">
-          <!-- Loading skeleton -->
-          <div v-if="loading" class="space-y-4">
-            <article v-for="i in 4" :key="i" class="home-skeleton-card">
-              <div class="home-skeleton-cover"></div>
-              <div class="home-skeleton-body">
-                <div class="home-skeleton-line home-skeleton-title"></div>
-                <div class="home-skeleton-line home-skeleton-summary"></div>
-                <div class="home-skeleton-line home-skeleton-summary-short"></div>
-                <div class="home-skeleton-meta">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-                <div class="home-skeleton-tags">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </article>
-          </div>
-
-          <!-- Empty state -->
-          <div v-else-if="!articles.length" class="empty-card min-h-[310px]">
-            <div class="empty-icon">M</div>
-            <h2 class="mt-5 text-2xl font-black text-[#0d3d2d] dark:text-white">
-              还没有发布文章
-            </h2>
-            <p
-              class="mt-3 max-w-md text-center text-sm leading-7 text-[#60786e] dark:text-[#cbd5e1]"
-            >
-              数据准备好后，文章会以图文卡片的形式展示在这里。你也可以先浏览分类、标签或专栏内容。
-            </p>
-            <div class="mt-6 flex flex-wrap justify-center gap-2">
-              <span class="tag-pill">Mint Blog</span>
-              <span class="tag-pill">Fresh Reading</span>
-              <span class="tag-pill">Coming Soon</span>
-            </div>
-          </div>
-
-          <!-- ====== Card Layout ====== -->
-          <template v-else>
-            <article
-              v-for="(a, i) in articles"
-              :key="a.id"
-              class="card group relative flex min-h-[154px] overflow-hidden sm:min-h-[190px] md:h-[200px] lg:h-[190px] xl:h-[220px]"
-            >
-              <img
-                v-if="isValidUrl(a.cover)"
-                :src="a.cover!"
-                class="hidden"
-                @error="onCoverError(a.id)"
-              />
-              <button class="mobile-cover sm:hidden" @click="goArticle(a.id)">
-                <span :style="cover(a)"></span>
-              </button>
-              <button v-if="i % 2 === 0" class="cover left-cover" @click="goArticle(a.id)">
-                <span :style="cover(a)"></span>
-              </button>
-              <div
-                class="relative z-10 flex min-w-0 flex-1 flex-col justify-center py-4 pl-3 pr-[14px] text-left sm:w-[64%] sm:justify-between sm:p-5 sm:px-8 lg:px-6 xl:px-10"
-              >
-                <div class="min-w-0 cursor-pointer" @click="goArticle(a.id)">
-                  <div
-                    class="mb-2 flex items-center justify-between gap-2 sm:hidden"
-                    :class="{ 'pr-[0px]': a.isTop }"
-                  >
-                    <ATooltip title="标签">
-                      <button
-                        class="mobile-category-pill"
-                        :disabled="!primaryTag(a)"
-                        @click.stop="primaryTag(a) && goTag(primaryTag(a)!.id, primaryTag(a)!.name)"
-                      >
-                        #&nbsp;{{ primaryTag(a)?.name || '无标签' }}
-                      </button>
-                    </ATooltip>
-                    <span class="mobile-date">{{ formatDate(getArticleDisplayTime(a)) }}</span>
-                  </div>
-                  <h2
-                    class="line-clamp-1 text-[18px] font-black leading-7 text-[#0d3d2d] hover:text-[#3ecf9a] dark:text-white dark:hover:text-[#539dfd] sm:text-xl md:text-2xl"
-                  >
-                    {{ a.title }}
-                  </h2>
-                  <p
-                    class="mt-1 line-clamp-1 text-[14px] font-semibold leading-6 text-[#60786e] dark:text-[#cbd5e1] sm:mt-3 sm:line-clamp-2 sm:text-sm sm:leading-7 sm:indent-8 xl:line-clamp-3"
-                  >
-                    {{ info(a) }}
-                  </p>
-                </div>
-                <div>
-                  <div
-                    class="mt-2 flex flex-wrap items-center justify-start gap-3 text-[13px] text-[#8aa093] sm:mt-4 sm:justify-start sm:text-xs"
-                  >
-                    <ATooltip title="分类">
-                      <button
-                        class="inline-flex cursor-pointer items-center gap-1"
-                        @click.stop="goCategory(a.category?.id, a.category?.name)"
-                      >
-                        <span class="meta-icon meta-icon-category">
-                          <FolderOutlined />
-                        </span>
-                        {{ a.category?.name || '未分类' }}
-                      </button>
-                    </ATooltip>
-                    <ATooltip title="阅读量">
-                      <span class="inline-flex cursor-default items-center gap-1">
-                        <span class="meta-icon meta-icon-read">
-                          <EyeOutlined />
-                        </span>
-                        {{ views(a, i) }}
-                      </span>
-                    </ATooltip>
-                    <ATooltip title="发布时间">
-                      <span class="hidden cursor-default items-center gap-1 sm:inline-flex">
-                        <span class="meta-icon meta-icon-time">
-                          <CalendarOutlined />
-                        </span>
-                        {{ formatDate(getArticleDisplayTime(a)) }}
-                      </span>
-                    </ATooltip>
-                  </div>
-                  <div class="mt-3 hidden flex-wrap justify-center gap-2 sm:flex sm:justify-start">
-                    <ATooltip v-for="tag in (a.tags || []).slice(0, 4)" :key="tag.id" title="标签">
-                      <button
-                        class="tag"
-                        @click.stop="goTag(tag.id, tag.name)"
-                      >
-                      #&nbsp;{{ tag.name }}
-                      </button>
-                    </ATooltip>
-                  </div>
-                </div>
-              </div>
-              <div
-                class="card-cover-glow absolute inset-0 bg-cover bg-center opacity-20 blur-3xl dark:opacity-14"
-                :style="cover(a)"
-              ></div>
-              <button v-if="i % 2 !== 0" class="cover right-cover" @click="goArticle(a.id)">
-                <span :style="cover(a)"></span>
-              </button>
-              <div
-                v-if="a.isTop"
-                class="top-badge absolute z-30 rounded-full bg-gradient-to-r from-[#ff6b6b] to-[#ef4444] px-3 py-1 text-xs font-black text-white shadow-lg shadow-red-500/20"
-              >
-                置顶
-              </div>
-            </article>
-          </template>
-
-          <!-- Pagination -->
-          <div v-if="pages > 0" class="surfer-pagination flex justify-center pt-0">
-            <APagination
-              :current="current"
-              :page-size="size"
-              :total="total"
-              :show-size-changer="false"
-              @change="goPage"
-            />
-          </div>
-        </section>
-      </ACol>
-
-      <!-- ---- Sidebar (Right) ---- -->
-      <ACol :xs="24" :lg="7" class="mt-0 lg:mt-0">
-        <SidebarRight />
-      </ACol>
-    </ARow>
-  </main>
-</template>
 
 <style scoped lang="scss">
 .slide-hero {

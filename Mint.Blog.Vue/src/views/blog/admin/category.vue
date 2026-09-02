@@ -1,6 +1,221 @@
+<template>
+  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div class="flex-shrink-0 bg-layout pb-4">
+      <ACard :bordered="false" class="card-wrapper">
+        <AForm layout="inline" class="responsive-search-form">
+          <AFormItem label="分类名称">
+            <AInput
+              v-model:value="query.name"
+              allow-clear
+              placeholder="请输入（模糊查询）"
+              class="w-full sm:w-[220px]"
+              @press-enter="loadData"
+            />
+          </AFormItem>
+          <AFormItem label="创建日期">
+            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
+          </AFormItem>
+          <AFormItem>
+            <ASpace wrap>
+              <AButton type="primary" @click="loadData">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </AButton>
+              <AButton @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </AButton>
+              <AButton type="primary" @click="openCreateModal">
+                <template #icon><PlusOutlined /></template>
+                新增
+              </AButton>
+            </ASpace>
+          </AFormItem>
+        </AForm>
+      </ACard>
+    </div>
+
+    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
+      <ATable
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="record => record.id"
+        :row-class-name="record => (isCategoryDeleted(record as CategoryListItem) ? 'deleted-row' : '')"
+        :scroll="{ x: tableScrollX, y: tableScrollY }"
+        bordered
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'name'">
+            <ATag color="blue">{{ record.name }}</ATag>
+          </template>
+          <template v-else-if="column.key === 'createTime'">
+            {{ getCreateTime(record as CategoryListItem) }}
+          </template>
+          <template v-else-if="column.key === 'isDeleted'">
+            <ATag :color="isCategoryDeleted(record as CategoryListItem) ? 'red' : 'green'">
+              {{ isCategoryDeleted(record as CategoryListItem) ? '已删除' : '未删除' }}
+            </ATag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <ASpace>
+              <ATooltip title="置顶">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === 0"
+                  @click="moveCategoryToFirst(record as CategoryListItem, index)"
+                >
+                  <template #icon><VerticalAlignTopOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="置底">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveCategoryToLast(record as CategoryListItem, index)"
+                >
+                  <template #icon><VerticalAlignBottomOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="上移">
+                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveCategoryUp(index)">
+                  <template #icon><UpOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="下移">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveCategoryDown(index)"
+                >
+                  <template #icon><DownOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="编辑">
+                <AButton type="primary" size="small" shape="circle" @click="openEditModal(record as CategoryListItem)">
+                  <template #icon><EditOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="删除">
+                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as CategoryListItem)">
+                  <template #icon><DeleteOutlined /></template>
+                </AButton>
+              </ATooltip>
+            </ASpace>
+          </template>
+        </template>
+      </ATable>
+    </ACard>
+
+    <AModal v-model:open="createModalVisible" title="添加文章分类" :width="modalWidth" :footer="null">
+      <AForm ref="formRef" :model="form" :rules="rules" layout="vertical">
+        <AFormItem label="分类名称" name="name">
+          <AInput v-model:value="form.name" allow-clear show-count :maxlength="20" placeholder="请输入分类名称" />
+        </AFormItem>
+      </AForm>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="handleCancel">取消</AButton>
+        <AButton type="primary" size="middle" :loading="submitLoading" @click="handleSubmit">确定</AButton>
+      </div>
+    </AModal>
+
+    <AModal
+      v-model:open="deleteModalVisible"
+      title="删除分类"
+      :width="deleteModalWidth"
+      :footer="null"
+      wrap-class-name="delete-dialog"
+    >
+      <div class="delete-content py-4">
+        <div class="mb-4 flex items-center">
+          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
+            <DeleteOutlined />
+          </div>
+          <div>
+            <div class="font-medium text-gray-900 dark:text-white">确认删除分类</div>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除类型，谨慎操作</div>
+          </div>
+        </div>
+        <div class="delete-info mb-4 rounded-lg p-4">
+          <p class="text-sm">
+            是否确定要删除分类
+            <span class="font-medium">"{{ currentDeleteCategory?.name }}"</span>
+            ？
+          </p>
+          <p class="mt-2 text-xs">删除后该分类下的所有文章将变为未分类状态</p>
+        </div>
+        <div class="delete-type-selection mb-4">
+          <div class="mb-3 text-sm font-medium">删除类型：</div>
+          <ARadioGroup v-model:value="deleteType" class="w-full">
+            <div class="flex flex-col gap-3">
+              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
+                <div class="ml-2">
+                  <div class="font-medium">逻辑删除</div>
+                  <div class="mt-1 text-xs text-gray-500">分类将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
+                </div>
+              </ARadio>
+              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
+                <div class="ml-2">
+                  <div class="font-medium">物理删除</div>
+                  <div class="mt-1 text-xs text-gray-500">分类将从数据库中永久删除，此操作不可恢复</div>
+                  <div v-if="(currentDeleteCategory?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
+                    当前分类下还有 {{ currentDeleteCategory?.articlesTotal }} 篇文章，不能物理删除
+                  </div>
+                </div>
+              </ARadio>
+              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
+                <div class="ml-2">
+                  <div class="font-medium">取消删除</div>
+                  <div class="mt-1 text-xs text-gray-500">恢复已删除的分类，使其重新可见</div>
+                </div>
+              </ARadio>
+            </div>
+          </ARadioGroup>
+        </div>
+      </div>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
+        <AButton
+          type="primary"
+          :danger="deleteType !== 3"
+          size="middle"
+          :loading="deleteLoading"
+          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
+          @click="handleDelete"
+        >
+          {{ getDeleteButtonText() }}
+        </AButton>
+      </div>
+    </AModal>
+
+    <AModal v-model:open="editModalVisible" title="编辑分类" :width="modalWidth" :footer="null">
+      <AForm ref="editFormRef" :model="editForm" layout="vertical" :rules="editRules">
+        <AFormItem label="分类名称" name="name">
+          <AInput v-model:value="editForm.name" placeholder="请输入分类名称" :maxlength="20" show-count />
+        </AFormItem>
+      </AForm>
+      <div class="mt-5 text-center">
+        <ASpace>
+          <AButton @click="handleEditCancel">取消</AButton>
+          <AButton type="primary" :loading="editLoading" @click="handleEditSubmit">确定</AButton>
+        </ASpace>
+      </div>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
-import type { FormInstance, TableColumnsType } from 'ant-design-vue';
+import type { FormInstance, FormProps, TableColumnsType } from 'ant-design-vue';
 import { message } from 'ant-design-vue';
 import type { Dayjs } from 'dayjs';
 import {
@@ -102,13 +317,13 @@ const pagination = computed(() => ({
   size: appStore.isMobile ? ('small' as const) : ('default' as const)
 }));
 
-const rules = {
+const rules: FormProps['rules'] = {
   name: [
     { required: true, message: '分类名称不能为空', trigger: 'blur' },
     { min: 1, max: 20, message: '分类名称字数要求大于 1 个字符，小于 20 个字符', trigger: 'blur' }
   ]
 };
-const editRules = {
+const editRules: FormProps['rules'] = {
   name: [
     { required: true, message: '请输入分类名称', trigger: 'blur' },
     { max: 20, message: '分类名称不能超过20个字符', trigger: 'blur' }
@@ -329,224 +544,11 @@ async function moveCategoryToLast(record: CategoryListItem, index: number) {
 onMounted(() => {
   loadData();
 });
+
 </script>
 
-<template>
-  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <div class="flex-shrink-0 bg-layout pb-4">
-      <ACard :bordered="false" class="card-wrapper">
-        <AForm layout="inline" class="responsive-search-form">
-          <AFormItem label="分类名称">
-            <AInput
-              v-model:value="query.name"
-              allow-clear
-              placeholder="请输入（模糊查询）"
-              class="w-full sm:w-[220px]"
-              @press-enter="loadData"
-            />
-          </AFormItem>
-          <AFormItem label="创建日期">
-            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
-          </AFormItem>
-          <AFormItem>
-            <ASpace wrap>
-              <AButton type="primary" @click="loadData">
-                <template #icon><SearchOutlined /></template>
-                查询
-              </AButton>
-              <AButton @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </AButton>
-              <AButton type="primary" @click="openCreateModal">
-                <template #icon><PlusOutlined /></template>
-                新增
-              </AButton>
-            </ASpace>
-          </AFormItem>
-        </AForm>
-      </ACard>
-    </div>
-
-    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
-      <ATable
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="record => record.id"
-        :row-class-name="record => (isCategoryDeleted(record as CategoryListItem) ? 'deleted-row' : '')"
-        :scroll="{ x: tableScrollX, y: tableScrollY }"
-        bordered
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">
-            {{ index + 1 }}
-          </template>
-          <template v-else-if="column.key === 'name'">
-            <ATag color="blue">{{ record.name }}</ATag>
-          </template>
-          <template v-else-if="column.key === 'createTime'">
-            {{ getCreateTime(record as CategoryListItem) }}
-          </template>
-          <template v-else-if="column.key === 'isDeleted'">
-            <ATag :color="isCategoryDeleted(record as CategoryListItem) ? 'red' : 'green'">
-              {{ isCategoryDeleted(record as CategoryListItem) ? '已删除' : '未删除' }}
-            </ATag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <ASpace>
-              <ATooltip title="置顶">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === 0"
-                  @click="moveCategoryToFirst(record as CategoryListItem, index)"
-                >
-                  <template #icon><VerticalAlignTopOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="置底">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveCategoryToLast(record as CategoryListItem, index)"
-                >
-                  <template #icon><VerticalAlignBottomOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="上移">
-                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveCategoryUp(index)">
-                  <template #icon><UpOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="下移">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveCategoryDown(index)"
-                >
-                  <template #icon><DownOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="编辑">
-                <AButton type="primary" size="small" shape="circle" @click="openEditModal(record as CategoryListItem)">
-                  <template #icon><EditOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="删除">
-                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as CategoryListItem)">
-                  <template #icon><DeleteOutlined /></template>
-                </AButton>
-              </ATooltip>
-            </ASpace>
-          </template>
-        </template>
-      </ATable>
-    </ACard>
-
-    <AModal v-model:open="createModalVisible" title="添加文章分类" :width="modalWidth" :footer="null">
-      <AForm ref="formRef" :model="form" :rules="rules" layout="vertical">
-        <AFormItem label="分类名称" name="name">
-          <AInput v-model:value="form.name" allow-clear show-count :maxlength="20" placeholder="请输入分类名称" />
-        </AFormItem>
-      </AForm>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="handleCancel">取消</AButton>
-        <AButton type="primary" size="middle" :loading="submitLoading" @click="handleSubmit">确定</AButton>
-      </div>
-    </AModal>
-
-    <AModal
-      v-model:open="deleteModalVisible"
-      title="删除分类"
-      :width="deleteModalWidth"
-      :footer="null"
-      wrap-class-name="delete-dialog"
-    >
-      <div class="delete-content py-4">
-        <div class="mb-4 flex items-center">
-          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
-            <DeleteOutlined />
-          </div>
-          <div>
-            <div class="font-medium text-gray-900 dark:text-white">确认删除分类</div>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除类型，谨慎操作</div>
-          </div>
-        </div>
-        <div class="delete-info mb-4 rounded-lg p-4">
-          <p class="text-sm">
-            是否确定要删除分类
-            <span class="font-medium">"{{ currentDeleteCategory?.name }}"</span>
-            ？
-          </p>
-          <p class="mt-2 text-xs">删除后该分类下的所有文章将变为未分类状态</p>
-        </div>
-        <div class="delete-type-selection mb-4">
-          <div class="mb-3 text-sm font-medium">删除类型：</div>
-          <ARadioGroup v-model:value="deleteType" class="w-full">
-            <div class="flex flex-col gap-3">
-              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
-                <div class="ml-2">
-                  <div class="font-medium">逻辑删除</div>
-                  <div class="mt-1 text-xs text-gray-500">分类将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
-                </div>
-              </ARadio>
-              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
-                <div class="ml-2">
-                  <div class="font-medium">物理删除</div>
-                  <div class="mt-1 text-xs text-gray-500">分类将从数据库中永久删除，此操作不可恢复</div>
-                  <div v-if="(currentDeleteCategory?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
-                    当前分类下还有 {{ currentDeleteCategory?.articlesTotal }} 篇文章，不能物理删除
-                  </div>
-                </div>
-              </ARadio>
-              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
-                <div class="ml-2">
-                  <div class="font-medium">取消删除</div>
-                  <div class="mt-1 text-xs text-gray-500">恢复已删除的分类，使其重新可见</div>
-                </div>
-              </ARadio>
-            </div>
-          </ARadioGroup>
-        </div>
-      </div>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
-        <AButton
-          type="primary"
-          :danger="deleteType !== 3"
-          size="middle"
-          :loading="deleteLoading"
-          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
-          @click="handleDelete"
-        >
-          {{ getDeleteButtonText() }}
-        </AButton>
-      </div>
-    </AModal>
-
-    <AModal v-model:open="editModalVisible" title="编辑分类" :width="modalWidth" :footer="null">
-      <AForm ref="editFormRef" :model="editForm" layout="vertical" :rules="editRules">
-        <AFormItem label="分类名称" name="name">
-          <AInput v-model:value="editForm.name" placeholder="请输入分类名称" :maxlength="20" show-count />
-        </AFormItem>
-      </AForm>
-      <div class="mt-5 text-center">
-        <ASpace>
-          <AButton @click="handleEditCancel">取消</AButton>
-          <AButton type="primary" :loading="editLoading" @click="handleEditSubmit">确定</AButton>
-        </ASpace>
-      </div>
-    </AModal>
-  </div>
-</template>
-
 <style scoped lang="scss">
+
 .category-page {
   height: 100%;
 }

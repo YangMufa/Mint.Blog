@@ -1,110 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { CalendarOutlined, DownOutlined, TagOutlined, UpOutlined } from '@ant-design/icons-vue';
-import { getTagArticlePageList, getTagList } from '@/service/blog/surfer/tag';
-import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
-
-defineOptions({ name: 'SurferTagPage' });
-
-type Api<T> = { success: boolean; data: T };
-type TagItem = { id: number; name: string; articlesTotal: number; sort?: number };
-type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
-type PageResult = {
-  success: boolean;
-  data: ArticleItem[];
-  current: number;
-  size: number;
-  total: number;
-  pages: number;
-};
-
-const route = useRoute();
-const router = useRouter();
-
-const allTags = ref<TagItem[]>([]);
-const articles = ref<ArticleItem[]>([]);
-const tagName = ref((route.query.name as string) || '');
-const tagId = ref((route.query.id as string) || '');
-const current = computed(() => {
-  const q = route.query.page;
-  const n = Number(q);
-  return Number.isFinite(n) && n > 0 ? n : 1;
-});
-const size = ref(10);
-const total = ref(0);
-const pages = ref(0);
-const loading = ref(false);
-const isMobileTagCollapsed = ref(true);
-
-function getTagArticles(pageNo: number) {
-  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
-  loading.value = true;
-  articles.value = [];
-  getTagArticlePageList<PageResult>({
-    current: pageNo,
-    size: size.value,
-    id: tagId.value,
-    tagId: tagId.value
-  })
-    .then(res => {
-      if (res.success) {
-        articles.value = res.data;
-        size.value = res.size;
-        total.value = res.total;
-        pages.value = res.pages;
-      }
-    })
-    .catch(() => {
-      articles.value = [];
-      total.value = 0;
-      pages.value = 0;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-function goArticleDetailPage(articleId: number) {
-  router.push(`/blog/surfer/article/${articleId}`);
-}
-function goTagPage(id: number, name: string) {
-  isMobileTagCollapsed.value = true;
-  router.push({ path: '/blog/surfer/tag', query: { id: String(id), name } });
-}
-function goPage(page: number) {
-  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
-}
-
-const byArticles = <T extends { id: number; articlesTotal?: number }>(list: T[]) =>
-  [...list].sort((a, b) => (b.articlesTotal || 0) - (a.articlesTotal || 0) || a.id - b.id);
-
-watch(route, newRoute => {
-  tagName.value = (newRoute.query.name as string) || '';
-  tagId.value = (newRoute.query.id as string) || '';
-  getTagArticles(current.value);
-});
-
-onMounted(async () => {
-  try {
-    const tags = await getTagList<Api<TagItem[]>>();
-    if (tags.success && tags.data?.length) {
-      const sorted = byArticles(tags.data.filter(tag => tag.articlesTotal > 0));
-      allTags.value = sorted;
-      if (!tagId.value && sorted.length > 0) {
-        const first = sorted[0];
-        await router.replace({ path: '/blog/surfer/tag', query: { id: String(first.id), name: first.name } });
-        tagId.value = String(first.id);
-        tagName.value = first.name;
-      }
-    }
-  } catch {
-    allTags.value = [];
-  }
-  getTagArticles(current.value);
-});
-</script>
-
 <template>
   <main class="mx-auto max-w-screen-2xl px-4 md:px-6 py-4">
     <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
@@ -233,6 +126,113 @@ onMounted(async () => {
     </div>
   </main>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { CalendarOutlined, DownOutlined, TagOutlined, UpOutlined } from '@ant-design/icons-vue';
+import { getTagArticlePageList, getTagList } from '@/service/blog/surfer/tag';
+import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
+
+defineOptions({ name: 'SurferTagPage' });
+
+type Api<T> = { success: boolean; data: T };
+type TagItem = { id: number; name: string; articlesTotal: number; sort?: number };
+type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
+type PageResult = {
+  success: boolean;
+  data: ArticleItem[];
+  current: number;
+  size: number;
+  total: number;
+  pages: number;
+};
+
+const route = useRoute();
+const router = useRouter();
+
+const allTags = ref<TagItem[]>([]);
+const articles = ref<ArticleItem[]>([]);
+const tagName = ref((route.query.name as string) || '');
+const tagId = ref((route.query.id as string) || '');
+const current = computed(() => {
+  const q = route.query.page;
+  const n = Number(q);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+});
+const size = ref(10);
+const total = ref(0);
+const pages = ref(0);
+const loading = ref(false);
+const isMobileTagCollapsed = ref(true);
+
+function getTagArticles(pageNo: number) {
+  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
+  loading.value = true;
+  articles.value = [];
+  getTagArticlePageList<PageResult>({
+    current: pageNo,
+    size: size.value,
+    id: tagId.value,
+    tagId: tagId.value
+  })
+    .then(res => {
+      if (res.success) {
+        articles.value = res.data;
+        size.value = res.size;
+        total.value = res.total;
+        pages.value = res.pages;
+      }
+    })
+    .catch(() => {
+      articles.value = [];
+      total.value = 0;
+      pages.value = 0;
+    })
+    .finally(() => {
+      loading.value = false;
+    });
+}
+
+function goArticleDetailPage(articleId: number) {
+  router.push(`/blog/surfer/article/${articleId}`);
+}
+function goTagPage(id: number, name: string) {
+  isMobileTagCollapsed.value = true;
+  router.push({ path: '/blog/surfer/tag', query: { id: String(id), name } });
+}
+function goPage(page: number) {
+  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
+}
+
+const byArticles = <T extends { id: number; articlesTotal?: number }>(list: T[]) =>
+  [...list].sort((a, b) => (b.articlesTotal || 0) - (a.articlesTotal || 0) || a.id - b.id);
+
+watch(route, newRoute => {
+  tagName.value = (newRoute.query.name as string) || '';
+  tagId.value = (newRoute.query.id as string) || '';
+  getTagArticles(current.value);
+});
+
+onMounted(async () => {
+  try {
+    const tags = await getTagList<Api<TagItem[]>>();
+    if (tags.success && tags.data?.length) {
+      const sorted = byArticles(tags.data.filter(tag => tag.articlesTotal > 0));
+      allTags.value = sorted;
+      if (!tagId.value && sorted.length > 0) {
+        const first = sorted[0];
+        await router.replace({ path: '/blog/surfer/tag', query: { id: String(first.id), name: first.name } });
+        tagId.value = String(first.id);
+        tagName.value = first.name;
+      }
+    }
+  } catch {
+    allTags.value = [];
+  }
+  getTagArticles(current.value);
+});
+</script>
 
 <style scoped lang="scss">
 @media (min-width: 1024px) {

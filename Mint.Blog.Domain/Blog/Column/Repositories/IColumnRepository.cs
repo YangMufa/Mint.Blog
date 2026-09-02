@@ -12,6 +12,10 @@ public interface IColumnRepository {
 	Task UpdateCatalogAsync(long columnId, IReadOnlyCollection<ColumnCatalogUpsertModel> catalogs,
 		CancellationToken cancellationToken = default);
 	Task ValidateArticleIdsAsync(IReadOnlyCollection<long> articleIds, CancellationToken cancellationToken = default);
+	Task<IReadOnlyDictionary<long, string>> GetArticleTitlesAsync(IReadOnlyCollection<long> articleIds,
+		CancellationToken cancellationToken = default);
+	Task<IReadOnlyCollection<long>> FilterOccupiedArticleIdsAsync(long columnId,
+		IReadOnlyCollection<long> articleIds, CancellationToken cancellationToken = default);
 }
 
 public sealed record ColumnCatalogUpsertModel(

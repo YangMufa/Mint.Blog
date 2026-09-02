@@ -1,3 +1,337 @@
+<template>
+  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div class="flex-shrink-0 bg-layout pb-4">
+      <ACard :bordered="false" class="card-wrapper">
+        <AForm layout="inline" class="responsive-search-form">
+          <AFormItem label="专栏标题">
+            <AInput v-model:value="query.title" allow-clear placeholder="请输入专栏标题" class="w-full sm:w-[220px]" />
+          </AFormItem>
+          <AFormItem label="创建日期">
+            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
+          </AFormItem>
+          <AFormItem>
+            <ASpace wrap>
+              <AButton type="primary" @click="loadData">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </AButton>
+              <AButton @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </AButton>
+              <AButton type="primary" @click="openCreateModal">
+                <template #icon><PlusOutlined /></template>
+                新增
+              </AButton>
+            </ASpace>
+          </AFormItem>
+        </AForm>
+      </ACard>
+    </div>
+
+    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
+      <ATable
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="record => record.id"
+        :row-class-name="record => (isColumnDeleted(record as AdminColumnPageItem) ? 'deleted-row' : '')"
+        :scroll="{ x: tableScrollX, y: tableScrollY }"
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'title'">
+            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="column-text-cell !mb-0" />
+          </template>
+          <template v-else-if="column.key === 'cover'">
+            <AImage :width="100" :src="record.cover" />
+          </template>
+          <template v-else-if="column.key === 'summary'">
+            <ATypographyParagraph :content="record.summary" :ellipsis="{ rows: 2 }" class="column-text-cell !mb-0" />
+          </template>
+          <template v-else-if="column.key === 'articlesTotal'">{{ record.articlesTotal }}</template>
+          <template v-else-if="column.key === 'isTop'">
+            <ASwitch
+              v-model:checked="record.isTop"
+              checked-children="置顶"
+              un-checked-children="普通"
+              @change="() => handleTopChange(record as AdminColumnPageItem)"
+            />
+          </template>
+          <template v-else-if="column.key === 'createdAt'">
+            {{ formatDateTime(record.createdAt) }}
+          </template>
+          <template v-else-if="column.key === 'isPublish'">
+            <ASwitch
+              v-model:checked="record.isPublish"
+              checked-children="发布"
+              un-checked-children="草稿"
+              @change="() => handlePublishChange(record as AdminColumnPageItem)"
+            />
+          </template>
+          <template v-else-if="column.key === 'isDeleted'">
+            <ATag :color="isColumnDeleted(record as AdminColumnPageItem) ? 'error' : 'success'">
+              {{ isColumnDeleted(record as AdminColumnPageItem) ? '已删除' : '未删除' }}
+            </ATag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <ASpace>
+              <ATooltip title="置顶">
+                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveColumnToFirst(record as AdminColumnPageItem, index)">
+                  <template #icon><VerticalAlignTopOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="置底">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveColumnToLast(record as AdminColumnPageItem, index)"
+                >
+                  <template #icon><VerticalAlignBottomOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="上移">
+                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveColumnUp(record as AdminColumnPageItem, index)">
+                  <template #icon><UpOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="下移">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveColumnDown(record as AdminColumnPageItem, index)"
+                >
+                  <template #icon><DownOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="编辑">
+                <AButton size="small" shape="circle" @click="openEditModal(record as AdminColumnPageItem)">
+                  <template #icon><EditOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="编辑目录">
+                <AButton size="small" shape="circle" @click="openCatalogModal(record as AdminColumnPageItem)">
+                  <template #icon><UnorderedListOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="预览">
+                <AButton size="small" shape="circle" @click="previewColumn(record as AdminColumnPageItem)">
+                  <template #icon><EyeOutlined /></template>
+                </AButton>
+              </ATooltip>
+
+              <ATooltip title="删除">
+                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as AdminColumnPageItem)">
+                  <template #icon><DeleteOutlined /></template>
+                </AButton>
+              </ATooltip>
+            </ASpace>
+          </template>
+        </template>
+      </ATable>
+    </ACard>
+
+    <AModal v-model:open="formModalVisible" title="新增专栏" class="column-modal" :width="modalWidth" :footer="null">
+      <AForm ref="formRef" :model="formModel" :rules="rules" :label-col="{ span: 4 }">
+        <AFormItem label="标题" name="title">
+          <AInput v-model:value="formModel.title" allow-clear show-count :maxlength="20" placeholder="请输入专栏标题" />
+        </AFormItem>
+        <AFormItem label="封面" name="cover">
+          <div class="cover-picker">
+            <label class="upload-preview">
+              <input type="file" accept="image/*" style="display:none" @change="handleCoverInputChange" />
+              <img v-if="formModel.cover" :src="formModel.cover" class="upload-image" alt="cover" />
+              <div v-else class="upload-placeholder">
+                <PlusOutlined class="upload-icon" />
+                <div class="upload-title">上传封面</div>
+                <div class="upload-hint">建议尺寸 200x120px</div>
+              </div>
+            </label>
+            <AButton html-type="button" @click="openGallerySelector('create')">从 RustFS 图库选择</AButton>
+          </div>
+        </AFormItem>
+        <AFormItem label="摘要" name="summary">
+          <ATextarea v-model:value="formModel.summary" :rows="3" allow-clear show-count :maxlength="30" placeholder="请输入专栏摘要" />
+        </AFormItem>
+      </AForm>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="closeCreateModal">取消</AButton>
+        <AButton type="primary" size="middle" :loading="formSubmitLoading" @click="handleSubmit">确定</AButton>
+      </div>
+    </AModal>
+
+    <AModal v-model:open="editFormModalVisible" title="编辑专栏" class="column-modal" :width="modalWidth" :footer="null">
+      <AForm ref="editFormRef" :model="editFormModel" :rules="rules" :label-col="{ span: 4 }">
+        <AFormItem label="标题" name="title">
+          <AInput v-model:value="editFormModel.title" allow-clear show-count :maxlength="20" placeholder="请输入专栏标题" />
+        </AFormItem>
+        <AFormItem label="封面" name="cover">
+          <div class="cover-picker">
+            <label class="upload-preview">
+              <input type="file" accept="image/*" style="display:none" @change="handleEditCoverInputChange" />
+              <img v-if="editFormModel.cover" :src="editFormModel.cover" class="upload-image" alt="cover" />
+              <div v-else class="upload-placeholder">
+                <PlusOutlined class="upload-icon" />
+                <div class="upload-title">上传封面</div>
+                <div class="upload-hint">建议尺寸 200x120px</div>
+              </div>
+            </label>
+            <AButton html-type="button" @click="openGallerySelector('edit')">从 RustFS 图库选择</AButton>
+          </div>
+        </AFormItem>
+        <AFormItem label="摘要" name="summary">
+          <ATextarea v-model:value="editFormModel.summary" :rows="3" allow-clear show-count :maxlength="30" placeholder="请输入专栏摘要" />
+        </AFormItem>
+      </AForm>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="closeEditModal">取消</AButton>
+        <AButton type="primary" size="middle" :loading="editFormSubmitLoading" @click="handleEditSubmit">确定</AButton>
+      </div>
+    </AModal>
+
+    <AModal v-model:open="deleteModalVisible" title="删除专栏" :width="deleteModalWidth" :footer="null" wrap-class-name="delete-dialog">
+      <div class="delete-content py-4">
+        <div class="mb-4 flex items-center">
+          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
+            <DeleteOutlined />
+          </div>
+          <div>
+            <div class="font-medium text-gray-900 dark:text-white">确认删除专栏</div>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除方式，不同方式的影响不同</div>
+          </div>
+        </div>
+        <div class="delete-info mb-4 rounded-lg p-4">
+          <p class="text-sm">
+            是否确定要删除专栏 <span class="font-medium">"{{ currentDeleteColumn?.title }}"</span> ？
+          </p>
+          <p class="mt-2 text-xs">删除后该专栏下的所有文章将一并删除</p>
+        </div>
+
+        <div class="delete-type-selection">
+          <div class="mb-3 text-sm font-medium text-gray-900 dark:text-white">删除方式：</div>
+          <ARadioGroup v-model:value="deleteType" class="w-full">
+            <div class="flex flex-col gap-3">
+              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
+                <div class="ml-2">
+                  <div class="font-medium">逻辑删除</div>
+                  <div class="mt-1 text-xs text-gray-500">专栏将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
+                </div>
+              </ARadio>
+              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
+                <div class="ml-2">
+                  <div class="font-medium">物理删除</div>
+                  <div class="mt-1 text-xs text-gray-500">专栏将从数据库中彻底删除，包括所有文章，此操作不可撤销</div>
+                  <div v-if="(currentDeleteColumn?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
+                    当前专栏下还有 {{ currentDeleteColumn?.articlesTotal }} 篇文章，不能物理删除
+                  </div>
+                </div>
+              </ARadio>
+              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
+                <div class="ml-2">
+                  <div class="font-medium">取消删除</div>
+                  <div class="mt-1 text-xs text-gray-500">恢复已删除的专栏，使其重新可用</div>
+                </div>
+              </ARadio>
+            </div>
+          </ARadioGroup>
+        </div>
+      </div>
+
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
+        <AButton
+          type="primary"
+          :danger="deleteType !== 3"
+          size="middle"
+          :loading="deleteLoading"
+          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
+          @click="handleDelete"
+        >
+          {{ getDeleteButtonText() }}
+        </AButton>
+      </div>
+    </AModal>
+
+    <RustfsImageSelector
+      v-model:open="gallerySelectorVisible"
+      :selected-url="getGallerySelectedUrl()"
+      @select="handleGallerySelect"
+    />
+
+    <AModal v-model:open="catalogModalVisible" title="编辑目录" :width="wideModalWidth" @ok="handleCatalogSubmit">
+      <div class="catalog-editor">
+        <div class="mb-3 mt-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+          <AAlert class="sm:mb-0" type="info" show-icon message="一级目录用于分组，二级目录关联文章；保存后会按当前顺序重建目录。" />
+          <AButton type="primary" @click="addCatalogParent">
+            <template #icon><PlusOutlined /></template>
+            新增一级目录
+          </AButton>
+        </div>
+        <AEmpty v-if="catalogItems.length === 0" description="暂无目录，请先新增一级目录" />
+        <div v-else class="space-y-4">
+          <ACard v-for="(parent, parentIndex) in catalogItems" :key="parent.id" size="small" class="catalog-parent-card">
+            <template #title>
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium">一级目录</span>
+                <AInput v-model:value="parent.title" placeholder="请输入一级目录标题" class="min-w-[220px] flex-1" />
+                <ATag :color="parent.isDeleted ? 'error' : 'success'">{{ parent.isDeleted ? '已删除' : '正常' }}</ATag>
+              </div>
+            </template>
+            <template #extra>
+              <ASpace>
+                <AButton size="small" :disabled="parentIndex === 0" @click="moveCatalogItem(catalogItems, parentIndex, -1)">上移</AButton>
+                <AButton size="small" :disabled="parentIndex === catalogItems.length - 1" @click="moveCatalogItem(catalogItems, parentIndex, 1)">下移</AButton>
+                <AButton size="small" @click="parent.isDeleted = !parent.isDeleted">{{ parent.isDeleted ? '恢复' : '逻辑删除' }}</AButton>
+                <AButton size="small" danger @click="removeCatalogParent(parentIndex)">移除</AButton>
+              </ASpace>
+            </template>
+
+            <div class="space-y-2">
+              <div v-for="(child, childIndex) in parent.children" :key="child.id" class="catalog-child-row">
+                <AInput v-model:value="child.title" placeholder="文章目录标题" class="min-w-[180px] flex-1" />
+                <ASelect
+                  v-model:value="child.articleId"
+                  :options="articleSearchOptions"
+                  :loading="articleSearchLoading"
+                  show-search
+                  :filter-option="false"
+                  placeholder="选择文章"
+                  class="w-[220px]"
+                  @focus="handleArticleSearch('')"
+                  @search="handleArticleSearch"
+                  @change="(val: any) => handleArticleSelect(val, child)"
+                />
+                <ATag :color="child.isDeleted ? 'error' : 'success'">{{ child.isDeleted ? '已删除' : '正常' }}</ATag>
+                <ASpace>
+                  <AButton size="small" :disabled="childIndex === 0" @click="moveCatalogItem(parent.children, childIndex, -1)">上移</AButton>
+                  <AButton size="small" :disabled="childIndex === parent.children.length - 1" @click="moveCatalogItem(parent.children, childIndex, 1)">下移</AButton>
+                  <AButton size="small" @click="child.isDeleted = !child.isDeleted">{{ child.isDeleted ? '恢复' : '逻辑删除' }}</AButton>
+                  <AButton size="small" danger @click="removeCatalogChild(parent, childIndex)">移除</AButton>
+                </ASpace>
+              </div>
+              <AButton type="dashed" block @click="addCatalogChild(parent)">
+                <template #icon><PlusOutlined /></template>
+                新增文章目录
+              </AButton>
+            </div>
+          </ACard>
+        </div>
+      </div>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import type { FormInstance, FormProps, TableColumnsType, TablePaginationConfig } from 'ant-design-vue';
@@ -496,340 +830,6 @@ async function handleDelete() {
 }
 onMounted(() => loadData());
 </script>
-
-<template>
-  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <div class="flex-shrink-0 bg-layout pb-4">
-      <ACard :bordered="false" class="card-wrapper">
-        <AForm layout="inline" class="responsive-search-form">
-          <AFormItem label="专栏标题">
-            <AInput v-model:value="query.title" allow-clear placeholder="请输入专栏标题" class="w-full sm:w-[220px]" />
-          </AFormItem>
-          <AFormItem label="创建日期">
-            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
-          </AFormItem>
-          <AFormItem>
-            <ASpace wrap>
-              <AButton type="primary" @click="loadData">
-                <template #icon><SearchOutlined /></template>
-                查询
-              </AButton>
-              <AButton @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </AButton>
-              <AButton type="primary" @click="openCreateModal">
-                <template #icon><PlusOutlined /></template>
-                新增
-              </AButton>
-            </ASpace>
-          </AFormItem>
-        </AForm>
-      </ACard>
-    </div>
-
-    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
-      <ATable
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="record => record.id"
-        :row-class-name="record => (isColumnDeleted(record as AdminColumnPageItem) ? 'deleted-row' : '')"
-        :scroll="{ x: tableScrollX, y: tableScrollY }"
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'title'">
-            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="column-text-cell !mb-0" />
-          </template>
-          <template v-else-if="column.key === 'cover'">
-            <AImage :width="100" :src="record.cover" />
-          </template>
-          <template v-else-if="column.key === 'summary'">
-            <ATypographyParagraph :content="record.summary" :ellipsis="{ rows: 2 }" class="column-text-cell !mb-0" />
-          </template>
-          <template v-else-if="column.key === 'articlesTotal'">{{ record.articlesTotal }}</template>
-          <template v-else-if="column.key === 'isTop'">
-            <ASwitch
-              v-model:checked="record.isTop"
-              checked-children="置顶"
-              un-checked-children="普通"
-              @change="() => handleTopChange(record as AdminColumnPageItem)"
-            />
-          </template>
-          <template v-else-if="column.key === 'createdAt'">
-            {{ formatDateTime(record.createdAt) }}
-          </template>
-          <template v-else-if="column.key === 'isPublish'">
-            <ASwitch
-              v-model:checked="record.isPublish"
-              checked-children="发布"
-              un-checked-children="草稿"
-              @change="() => handlePublishChange(record as AdminColumnPageItem)"
-            />
-          </template>
-          <template v-else-if="column.key === 'isDeleted'">
-            <ATag :color="isColumnDeleted(record as AdminColumnPageItem) ? 'error' : 'success'">
-              {{ isColumnDeleted(record as AdminColumnPageItem) ? '已删除' : '未删除' }}
-            </ATag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <ASpace>
-              <ATooltip title="置顶">
-                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveColumnToFirst(record as AdminColumnPageItem, index)">
-                  <template #icon><VerticalAlignTopOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="置底">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveColumnToLast(record as AdminColumnPageItem, index)"
-                >
-                  <template #icon><VerticalAlignBottomOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="上移">
-                <AButton size="small" shape="circle" :disabled="index === 0" @click="moveColumnUp(record as AdminColumnPageItem, index)">
-                  <template #icon><UpOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="下移">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveColumnDown(record as AdminColumnPageItem, index)"
-                >
-                  <template #icon><DownOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="编辑">
-                <AButton size="small" shape="circle" @click="openEditModal(record as AdminColumnPageItem)">
-                  <template #icon><EditOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="编辑目录">
-                <AButton size="small" shape="circle" @click="openCatalogModal(record as AdminColumnPageItem)">
-                  <template #icon><UnorderedListOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="预览">
-                <AButton size="small" shape="circle" @click="previewColumn(record as AdminColumnPageItem)">
-                  <template #icon><EyeOutlined /></template>
-                </AButton>
-              </ATooltip>
-
-              <ATooltip title="删除">
-                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as AdminColumnPageItem)">
-                  <template #icon><DeleteOutlined /></template>
-                </AButton>
-              </ATooltip>
-            </ASpace>
-          </template>
-        </template>
-      </ATable>
-    </ACard>
-
-    <AModal v-model:open="formModalVisible" title="新增专栏" class="column-modal" :width="modalWidth" :footer="null">
-      <AForm ref="formRef" :model="formModel" :rules="rules" :label-col="{ span: 4 }">
-        <AFormItem label="标题" name="title">
-          <AInput v-model:value="formModel.title" allow-clear show-count :maxlength="20" placeholder="请输入专栏标题" />
-        </AFormItem>
-        <AFormItem label="封面" name="cover">
-          <div class="cover-picker">
-            <label class="upload-preview">
-              <input type="file" accept="image/*" style="display:none" @change="handleCoverInputChange" />
-              <img v-if="formModel.cover" :src="formModel.cover" class="upload-image" alt="cover" />
-              <div v-else class="upload-placeholder">
-                <PlusOutlined class="upload-icon" />
-                <div class="upload-title">上传封面</div>
-                <div class="upload-hint">建议尺寸 200x120px</div>
-              </div>
-            </label>
-            <AButton html-type="button" @click="openGallerySelector('create')">从 RustFS 图库选择</AButton>
-          </div>
-        </AFormItem>
-        <AFormItem label="摘要" name="summary">
-          <ATextarea v-model:value="formModel.summary" :rows="3" allow-clear show-count :maxlength="30" placeholder="请输入专栏摘要" />
-        </AFormItem>
-      </AForm>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="closeCreateModal">取消</AButton>
-        <AButton type="primary" size="middle" :loading="formSubmitLoading" @click="handleSubmit">确定</AButton>
-      </div>
-    </AModal>
-
-    <AModal v-model:open="editFormModalVisible" title="编辑专栏" class="column-modal" :width="modalWidth" :footer="null">
-      <AForm ref="editFormRef" :model="editFormModel" :rules="rules" :label-col="{ span: 4 }">
-        <AFormItem label="标题" name="title">
-          <AInput v-model:value="editFormModel.title" allow-clear show-count :maxlength="20" placeholder="请输入专栏标题" />
-        </AFormItem>
-        <AFormItem label="封面" name="cover">
-          <div class="cover-picker">
-            <label class="upload-preview">
-              <input type="file" accept="image/*" style="display:none" @change="handleEditCoverInputChange" />
-              <img v-if="editFormModel.cover" :src="editFormModel.cover" class="upload-image" alt="cover" />
-              <div v-else class="upload-placeholder">
-                <PlusOutlined class="upload-icon" />
-                <div class="upload-title">上传封面</div>
-                <div class="upload-hint">建议尺寸 200x120px</div>
-              </div>
-            </label>
-            <AButton html-type="button" @click="openGallerySelector('edit')">从 RustFS 图库选择</AButton>
-          </div>
-        </AFormItem>
-        <AFormItem label="摘要" name="summary">
-          <ATextarea v-model:value="editFormModel.summary" :rows="3" allow-clear show-count :maxlength="30" placeholder="请输入专栏摘要" />
-        </AFormItem>
-      </AForm>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="closeEditModal">取消</AButton>
-        <AButton type="primary" size="middle" :loading="editFormSubmitLoading" @click="handleEditSubmit">确定</AButton>
-      </div>
-    </AModal>
-
-    <AModal v-model:open="deleteModalVisible" title="删除专栏" :width="deleteModalWidth" :footer="null" wrap-class-name="delete-dialog">
-      <div class="delete-content py-4">
-        <div class="mb-4 flex items-center">
-          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
-            <DeleteOutlined />
-          </div>
-          <div>
-            <div class="font-medium text-gray-900 dark:text-white">确认删除专栏</div>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除方式，不同方式的影响不同</div>
-          </div>
-        </div>
-        <div class="delete-info mb-4 rounded-lg p-4">
-          <p class="text-sm">
-            是否确定要删除专栏 <span class="font-medium">"{{ currentDeleteColumn?.title }}"</span> ？
-          </p>
-          <p class="mt-2 text-xs">删除后该专栏下的所有文章将一并删除</p>
-        </div>
-
-        <div class="delete-type-selection">
-          <div class="mb-3 text-sm font-medium text-gray-900 dark:text-white">删除方式：</div>
-          <ARadioGroup v-model:value="deleteType" class="w-full">
-            <div class="flex flex-col gap-3">
-              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
-                <div class="ml-2">
-                  <div class="font-medium">逻辑删除</div>
-                  <div class="mt-1 text-xs text-gray-500">专栏将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
-                </div>
-              </ARadio>
-              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
-                <div class="ml-2">
-                  <div class="font-medium">物理删除</div>
-                  <div class="mt-1 text-xs text-gray-500">专栏将从数据库中彻底删除，包括所有文章，此操作不可撤销</div>
-                  <div v-if="(currentDeleteColumn?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
-                    当前专栏下还有 {{ currentDeleteColumn?.articlesTotal }} 篇文章，不能物理删除
-                  </div>
-                </div>
-              </ARadio>
-              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
-                <div class="ml-2">
-                  <div class="font-medium">取消删除</div>
-                  <div class="mt-1 text-xs text-gray-500">恢复已删除的专栏，使其重新可用</div>
-                </div>
-              </ARadio>
-            </div>
-          </ARadioGroup>
-        </div>
-      </div>
-
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
-        <AButton
-          type="primary"
-          :danger="deleteType !== 3"
-          size="middle"
-          :loading="deleteLoading"
-          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
-          @click="handleDelete"
-        >
-          {{ getDeleteButtonText() }}
-        </AButton>
-      </div>
-    </AModal>
-
-    <RustfsImageSelector
-      v-model:open="gallerySelectorVisible"
-      :selected-url="getGallerySelectedUrl()"
-      @select="handleGallerySelect"
-    />
-
-    <AModal v-model:open="catalogModalVisible" title="编辑目录" :width="wideModalWidth" @ok="handleCatalogSubmit">
-      <div class="catalog-editor">
-        <div class="mb-3 mt-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-          <AAlert class="sm:mb-0" type="info" show-icon message="一级目录用于分组，二级目录关联文章；保存后会按当前顺序重建目录。" />
-          <AButton type="primary" @click="addCatalogParent">
-            <template #icon><PlusOutlined /></template>
-            新增一级目录
-          </AButton>
-        </div>
-        <AEmpty v-if="catalogItems.length === 0" description="暂无目录，请先新增一级目录" />
-        <div v-else class="space-y-4">
-          <ACard v-for="(parent, parentIndex) in catalogItems" :key="parent.id" size="small" class="catalog-parent-card">
-            <template #title>
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-sm font-medium">一级目录</span>
-                <AInput v-model:value="parent.title" placeholder="请输入一级目录标题" class="min-w-[220px] flex-1" />
-                <ATag :color="parent.isDeleted ? 'error' : 'success'">{{ parent.isDeleted ? '已删除' : '正常' }}</ATag>
-              </div>
-            </template>
-            <template #extra>
-              <ASpace>
-                <AButton size="small" :disabled="parentIndex === 0" @click="moveCatalogItem(catalogItems, parentIndex, -1)">上移</AButton>
-                <AButton size="small" :disabled="parentIndex === catalogItems.length - 1" @click="moveCatalogItem(catalogItems, parentIndex, 1)">下移</AButton>
-                <AButton size="small" @click="parent.isDeleted = !parent.isDeleted">{{ parent.isDeleted ? '恢复' : '逻辑删除' }}</AButton>
-                <AButton size="small" danger @click="removeCatalogParent(parentIndex)">移除</AButton>
-              </ASpace>
-            </template>
-
-            <div class="space-y-2">
-              <div v-for="(child, childIndex) in parent.children" :key="child.id" class="catalog-child-row">
-                <AInput v-model:value="child.title" placeholder="文章目录标题" class="min-w-[180px] flex-1" />
-                <ASelect
-                  v-model:value="child.articleId"
-                  :options="articleSearchOptions"
-                  :loading="articleSearchLoading"
-                  show-search
-                  :filter-option="false"
-                  placeholder="选择文章"
-                  class="w-[220px]"
-                  @focus="handleArticleSearch('')"
-                  @search="handleArticleSearch"
-                  @change="(val: any) => handleArticleSelect(val, child)"
-                />
-                <ATag :color="child.isDeleted ? 'error' : 'success'">{{ child.isDeleted ? '已删除' : '正常' }}</ATag>
-                <ASpace>
-                  <AButton size="small" :disabled="childIndex === 0" @click="moveCatalogItem(parent.children, childIndex, -1)">上移</AButton>
-                  <AButton size="small" :disabled="childIndex === parent.children.length - 1" @click="moveCatalogItem(parent.children, childIndex, 1)">下移</AButton>
-                  <AButton size="small" @click="child.isDeleted = !child.isDeleted">{{ child.isDeleted ? '恢复' : '逻辑删除' }}</AButton>
-                  <AButton size="small" danger @click="removeCatalogChild(parent, childIndex)">移除</AButton>
-                </ASpace>
-              </div>
-              <AButton type="dashed" block @click="addCatalogChild(parent)">
-                <template #icon><PlusOutlined /></template>
-                新增文章目录
-              </AButton>
-            </div>
-          </ACard>
-        </div>
-      </div>
-    </AModal>
-  </div>
-</template>
 
 <style scoped lang="scss">
 .category-page {

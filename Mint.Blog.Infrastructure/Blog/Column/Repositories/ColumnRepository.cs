@@ -355,6 +355,17 @@ public sealed class ColumnRepository(ISqlSugarDbContext dbContext)
 		return validArticleIds.ToHashSet();
 	}
 
+	public async Task<IReadOnlyDictionary<long, string>> GetArticleTitlesAsync(IReadOnlyCollection<long> articleIds,
+		CancellationToken cancellationToken = default){
+		if (articleIds.Count == 0) return new Dictionary<long, string>();
+
+		return (await dbContext.Client.Queryable<ArticleDataModel>()
+			.Where(x => articleIds.Contains(x.Id))
+			.Select(x => new { x.Id, x.Title })
+			.ToListAsync())
+			.ToDictionary(x => x.Id, x => x.Title);
+	}
+
 	public async Task ValidateArticleIdsAsync(IReadOnlyCollection<long> articleIds, CancellationToken cancellationToken = default){
 		if (articleIds.Count == 0) return;
 
@@ -369,6 +380,24 @@ public sealed class ColumnRepository(ISqlSugarDbContext dbContext)
 
 		Guard.Against(invalidIds.Length > 0, ErrorCodes.ArticleNotFound,
 			$"以下文章 ID 不存在或已删除：{string.Join(", ", invalidIds)}");
+	}
+
+	public async Task<IReadOnlyCollection<long>> FilterOccupiedArticleIdsAsync(long columnId,
+		IReadOnlyCollection<long> articleIds, CancellationToken cancellationToken = default){
+		if (articleIds.Count == 0) return [];
+
+		var distinctIds = articleIds.Distinct().ToArray();
+		var occupiedArticleIds = await dbContext.Client.Queryable<ColumnCatalogDataModel>()
+			.Where(x => x.ColumnId != columnId && x.ArticleId.HasValue
+				&& distinctIds.Contains(x.ArticleId.Value))
+			.Select(x => x.ArticleId)
+			.ToListAsync();
+
+		return occupiedArticleIds
+			.Where(x => x.HasValue)
+			.Select(x => x!.Value)
+			.Distinct()
+			.ToArray();
 	}
 
 	private static IReadOnlyCollection<BlogColumnCatalogItemDto> BuildBlogCatalogTree(

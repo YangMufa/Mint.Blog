@@ -1,3 +1,224 @@
+<template>
+  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div class="flex-shrink-0 bg-layout pb-4">
+      <ACard :bordered="false" class="card-wrapper">
+        <AForm layout="inline" class="responsive-search-form">
+          <AFormItem label="文章标题">
+            <AInput
+              v-model:value="query.title"
+              allow-clear
+              placeholder="请输入（模糊查询）"
+              class="w-full sm:w-[220px]"
+              @press-enter="loadData"
+            />
+          </AFormItem>
+          <AFormItem label="创建日期">
+            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
+          </AFormItem>
+          <AFormItem>
+            <ASpace wrap>
+              <AButton type="primary" @click="loadData">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </AButton>
+              <AButton @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </AButton>
+              <AButton type="primary" class="w-full sm:w-auto" @click="goToCreateArticle">
+                <template #icon><EditOutlined /></template>
+                写文章
+              </AButton>
+              <AButton class="w-full sm:w-auto" @click="openDraftModal">草稿箱</AButton>
+            </ASpace>
+          </AFormItem>
+        </AForm>
+      </ACard>
+    </div>
+
+    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
+      <ATable
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="record => record.id"
+        :row-class-name="record => (isArticleDeleted(record as AdminArticleListItem) ? 'deleted-row' : '')"
+        :scroll="{ x: tableScrollX, y: tableScrollY }"
+        bordered
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'title'">
+            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="table-text-cell !mb-0" />
+          </template>
+          <template v-else-if="column.key === 'summary'">
+            <ATypographyParagraph :content="record.summary" :ellipsis="{ rows: 2 }" class="table-text-cell !mb-0" />
+          </template>
+          <template v-else-if="column.key === 'cover'">
+            <AImage :width="100" :src="record.cover" />
+          </template>
+          <template v-else-if="column.key === 'isTop'">
+            <ASwitch
+              v-model:checked="record.isTop"
+              checked-children="置顶"
+              un-checked-children="普通"
+              class="top-switch"
+              @change="() => handleTopChange(record.id, record.isTop)"
+            />
+          </template>
+          <template v-else-if="column.key === 'visibility'">
+            <ASwitch
+              :checked="record.visibility === 2"
+              checked-children="专栏"
+              un-checked-children="公开"
+              @change="checked => handleVisibilityChange(record as AdminArticleListItem, checked as boolean)"
+            />
+          </template>
+          <template v-else-if="column.key === 'isDeleted'">
+            <ATag :color="isArticleDeleted(record as AdminArticleListItem) ? 'error' : 'success'" class="status-tag">
+              {{ isArticleDeleted(record as AdminArticleListItem) ? '已删除' : '未删除' }}
+            </ATag>
+          </template>
+          <template v-else-if="column.key === 'createTime'">
+            {{ getCreateTime(record as AdminArticleListItem) }}
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <ASpace>
+              <ATooltip title="编辑">
+                <AButton size="small" shape="circle" @click="goToEditArticle(record.id)">
+                  <template #icon><EditOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="预览">
+                <AButton size="small" shape="circle" @click="goArticleDetailPage(record.id)">
+                  <template #icon><EyeOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="删除">
+                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as AdminArticleListItem)">
+                  <template #icon><DeleteOutlined /></template>
+                </AButton>
+              </ATooltip>
+            </ASpace>
+          </template>
+        </template>
+      </ATable>
+    </ACard>
+
+    <AModal
+      v-model:open="deleteModalVisible"
+      title="删除文章"
+      :width="deleteModalWidth"
+      :footer="null"
+      wrap-class-name="delete-dialog"
+    >
+      <div class="delete-content py-4">
+        <div class="mb-4 flex items-center">
+          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
+            <DeleteOutlined />
+          </div>
+          <div>
+            <div class="font-medium text-gray-900 dark:text-white">确认删除文章</div>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除类型，谨慎操作</div>
+          </div>
+        </div>
+        <div class="delete-info mb-4 rounded-lg p-4">
+          <p class="text-sm">
+            是否确定要删除文章
+            <span class="font-medium">"{{ currentDeleteArticle?.title }}"</span>
+            ？
+          </p>
+        </div>
+        <div class="delete-type-selection mb-4">
+          <div class="mb-3 text-sm font-medium">删除类型：</div>
+          <ARadioGroup v-model:value="deleteType" class="w-full">
+            <div class="flex flex-col gap-3">
+              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
+                <div class="ml-2">
+                  <div class="font-medium">逻辑删除</div>
+                  <div class="mt-1 text-xs text-gray-500">文章将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
+                </div>
+              </ARadio>
+              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
+                <div class="ml-2">
+                  <div class="font-medium">物理删除</div>
+                  <div class="mt-1 text-xs text-gray-500">文章将从数据库中彻底删除，包括相关图片，此操作不可撤销</div>
+                </div>
+              </ARadio>
+              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
+                <div class="ml-2">
+                  <div class="font-medium">取消删除</div>
+                  <div class="mt-1 text-xs text-gray-500">恢复已删除的文章，将删除状态重置为未删除</div>
+                </div>
+              </ARadio>
+            </div>
+          </ARadioGroup>
+        </div>
+      </div>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
+        <AButton
+          type="primary"
+          :danger="deleteType !== 3"
+          size="middle"
+          :loading="deleteLoading"
+          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
+          @click="confirmDelete"
+        >
+          {{ getDeleteButtonText() }}
+        </AButton>
+      </div>
+    </AModal>
+
+    <AModal v-model:open="draftModalVisible" title="草稿箱" :footer="null" width="900px">
+      <ATable :data-source="draftData" :loading="draftLoading" :pagination="false" :row-key="record => record.id" size="middle">
+        <ATableColumn title="标题" data-index="title" key="title">
+          <template #default="{ record }">
+            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="draft-title-cell !mb-0" />
+          </template>
+        </ATableColumn>
+        <ATableColumn title="类型" key="type">
+          <template #default="{ record }">
+            <ATag :color="record.isNewArticleDraft ? 'processing' : 'warning'">
+              {{ record.isNewArticleDraft ? '新增草稿' : '修改草稿' }}
+            </ATag>
+          </template>
+        </ATableColumn>
+        <ATableColumn title="分类" data-index="categoryName" key="categoryName" />
+        <ATableColumn
+          title="更新时间"
+          data-index="updatedAt"
+          key="updatedAt"
+          :sorter="
+            (a: unknown, b: unknown) =>
+              compareDateTime((a as ArticleDraftListItem).updatedAt, (b as ArticleDraftListItem).updatedAt)
+          "
+          default-sort-order="descend"
+          :sort-directions="['descend', 'ascend']"
+        >
+          <template #default="{ record }">
+            {{ formatDateTime(record.updatedAt) }}
+          </template>
+        </ATableColumn>
+        <ATableColumn title="操作" key="action" :width="220">
+          <template #default="{ record }">
+            <ASpace>
+              <AButton size="small" type="link" @click="goToEditDraft(record)">编辑</AButton>
+              <AButton size="small" type="link" @click="handlePublishDraft(record)">发布</AButton>
+              <APopconfirm title="删除草稿后会清理仅被该草稿使用的图片，确定删除？" @confirm="handleDeleteDraft(record)">
+                <AButton size="small" type="link" danger>删除</AButton>
+              </APopconfirm>
+            </ASpace>
+          </template>
+        </ATableColumn>
+      </ATable>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -232,227 +453,6 @@ onMounted(() => {
   loadData();
 });
 </script>
-
-<template>
-  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <div class="flex-shrink-0 bg-layout pb-4">
-      <ACard :bordered="false" class="card-wrapper">
-        <AForm layout="inline" class="responsive-search-form">
-          <AFormItem label="文章标题">
-            <AInput
-              v-model:value="query.title"
-              allow-clear
-              placeholder="请输入（模糊查询）"
-              class="w-full sm:w-[220px]"
-              @press-enter="loadData"
-            />
-          </AFormItem>
-          <AFormItem label="创建日期">
-            <ARangePicker v-model:value="dateRange" class="w-full sm:w-[280px]" @change="handleDateChange" />
-          </AFormItem>
-          <AFormItem>
-            <ASpace wrap>
-              <AButton type="primary" @click="loadData">
-                <template #icon><SearchOutlined /></template>
-                查询
-              </AButton>
-              <AButton @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </AButton>
-              <AButton type="primary" class="w-full sm:w-auto" @click="goToCreateArticle">
-                <template #icon><EditOutlined /></template>
-                写文章
-              </AButton>
-              <AButton class="w-full sm:w-auto" @click="openDraftModal">草稿箱</AButton>
-            </ASpace>
-          </AFormItem>
-        </AForm>
-      </ACard>
-    </div>
-
-    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
-      <ATable
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="record => record.id"
-        :row-class-name="record => (isArticleDeleted(record as AdminArticleListItem) ? 'deleted-row' : '')"
-        :scroll="{ x: tableScrollX, y: tableScrollY }"
-        bordered
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'title'">
-            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="table-text-cell !mb-0" />
-          </template>
-          <template v-else-if="column.key === 'summary'">
-            <ATypographyParagraph :content="record.summary" :ellipsis="{ rows: 2 }" class="table-text-cell !mb-0" />
-          </template>
-          <template v-else-if="column.key === 'cover'">
-            <AImage :width="100" :src="record.cover" />
-          </template>
-          <template v-else-if="column.key === 'isTop'">
-            <ASwitch
-              v-model:checked="record.isTop"
-              checked-children="置顶"
-              un-checked-children="普通"
-              class="top-switch"
-              @change="() => handleTopChange(record.id, record.isTop)"
-            />
-          </template>
-          <template v-else-if="column.key === 'visibility'">
-            <ASwitch
-              :checked="record.visibility === 2"
-              checked-children="专栏"
-              un-checked-children="公开"
-              @change="checked => handleVisibilityChange(record as AdminArticleListItem, checked as boolean)"
-            />
-          </template>
-          <template v-else-if="column.key === 'isDeleted'">
-            <ATag :color="isArticleDeleted(record as AdminArticleListItem) ? 'error' : 'success'" class="status-tag">
-              {{ isArticleDeleted(record as AdminArticleListItem) ? '已删除' : '未删除' }}
-            </ATag>
-          </template>
-          <template v-else-if="column.key === 'createTime'">
-            {{ getCreateTime(record as AdminArticleListItem) }}
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <ASpace>
-              <ATooltip title="编辑">
-                <AButton size="small" shape="circle" @click="goToEditArticle(record.id)">
-                  <template #icon><EditOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="预览">
-                <AButton size="small" shape="circle" @click="goArticleDetailPage(record.id)">
-                  <template #icon><EyeOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="删除">
-                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as AdminArticleListItem)">
-                  <template #icon><DeleteOutlined /></template>
-                </AButton>
-              </ATooltip>
-            </ASpace>
-          </template>
-        </template>
-      </ATable>
-    </ACard>
-
-    <AModal
-      v-model:open="deleteModalVisible"
-      title="删除文章"
-      :width="deleteModalWidth"
-      :footer="null"
-      wrap-class-name="delete-dialog"
-    >
-      <div class="delete-content py-4">
-        <div class="mb-4 flex items-center">
-          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
-            <DeleteOutlined />
-          </div>
-          <div>
-            <div class="font-medium text-gray-900 dark:text-white">确认删除文章</div>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除类型，谨慎操作</div>
-          </div>
-        </div>
-        <div class="delete-info mb-4 rounded-lg p-4">
-          <p class="text-sm">
-            是否确定要删除文章
-            <span class="font-medium">"{{ currentDeleteArticle?.title }}"</span>
-            ？
-          </p>
-        </div>
-        <div class="delete-type-selection mb-4">
-          <div class="mb-3 text-sm font-medium">删除类型：</div>
-          <ARadioGroup v-model:value="deleteType" class="w-full">
-            <div class="flex flex-col gap-3">
-              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
-                <div class="ml-2">
-                  <div class="font-medium">逻辑删除</div>
-                  <div class="mt-1 text-xs text-gray-500">文章将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
-                </div>
-              </ARadio>
-              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
-                <div class="ml-2">
-                  <div class="font-medium">物理删除</div>
-                  <div class="mt-1 text-xs text-gray-500">文章将从数据库中彻底删除，包括相关图片，此操作不可撤销</div>
-                </div>
-              </ARadio>
-              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
-                <div class="ml-2">
-                  <div class="font-medium">取消删除</div>
-                  <div class="mt-1 text-xs text-gray-500">恢复已删除的文章，将删除状态重置为未删除</div>
-                </div>
-              </ARadio>
-            </div>
-          </ARadioGroup>
-        </div>
-      </div>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
-        <AButton
-          type="primary"
-          :danger="deleteType !== 3"
-          size="middle"
-          :loading="deleteLoading"
-          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
-          @click="confirmDelete"
-        >
-          {{ getDeleteButtonText() }}
-        </AButton>
-      </div>
-    </AModal>
-
-    <AModal v-model:open="draftModalVisible" title="草稿箱" :footer="null" width="900px">
-      <ATable :data-source="draftData" :loading="draftLoading" :pagination="false" :row-key="record => record.id" size="middle">
-        <ATableColumn title="标题" data-index="title" key="title">
-          <template #default="{ record }">
-            <ATypographyParagraph :content="record.title" :ellipsis="{ rows: 2 }" class="draft-title-cell !mb-0" />
-          </template>
-        </ATableColumn>
-        <ATableColumn title="类型" key="type">
-          <template #default="{ record }">
-            <ATag :color="record.isNewArticleDraft ? 'processing' : 'warning'">
-              {{ record.isNewArticleDraft ? '新增草稿' : '修改草稿' }}
-            </ATag>
-          </template>
-        </ATableColumn>
-        <ATableColumn title="分类" data-index="categoryName" key="categoryName" />
-        <ATableColumn
-          title="更新时间"
-          data-index="updatedAt"
-          key="updatedAt"
-          :sorter="
-            (a: unknown, b: unknown) =>
-              compareDateTime((a as ArticleDraftListItem).updatedAt, (b as ArticleDraftListItem).updatedAt)
-          "
-          default-sort-order="descend"
-          :sort-directions="['descend', 'ascend']"
-        >
-          <template #default="{ record }">
-            {{ formatDateTime(record.updatedAt) }}
-          </template>
-        </ATableColumn>
-        <ATableColumn title="操作" key="action" :width="220">
-          <template #default="{ record }">
-            <ASpace>
-              <AButton size="small" type="link" @click="goToEditDraft(record)">编辑</AButton>
-              <AButton size="small" type="link" @click="handlePublishDraft(record)">发布</AButton>
-              <APopconfirm title="删除草稿后会清理仅被该草稿使用的图片，确定删除？" @confirm="handleDeleteDraft(record)">
-                <AButton size="small" type="link" danger>删除</AButton>
-              </APopconfirm>
-            </ASpace>
-          </template>
-        </ATableColumn>
-      </ATable>
-    </AModal>
-  </div>
-</template>
 
 <style scoped lang="scss">
 .category-page {

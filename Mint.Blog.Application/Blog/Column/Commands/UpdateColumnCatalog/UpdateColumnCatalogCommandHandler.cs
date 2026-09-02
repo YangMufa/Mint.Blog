@@ -15,12 +15,30 @@ public sealed class UpdateColumnCatalogCommandHandler(IColumnRepository columnRe
 			.Select(x => x.ArticleId!.Value)
 			.ToArray();
 
-		var duplicatedIds = articleIds.GroupBy(id => id).Where(g => g.Count() > 1).Select(g => g.Key).ToArray();
-		Guard.Against(duplicatedIds.Length > 0, ErrorCodes.ColumnCatalogArticleDuplicate,
-			$"以下文章 ID 在同一专栏中重复引用：{string.Join(", ", duplicatedIds)}");
+		var duplicatedArticles = command.Catalogs
+			.SelectMany(parent => parent.Children
+				.Where(child => child.ArticleId > 0)
+				.Select(child => new { child.ArticleId, CatalogTitle = child.Title.Trim() }))
+			.GroupBy(x => x.ArticleId)
+			.Where(g => g.Count() > 1)
+			.ToArray();
+		if (duplicatedArticles.Length > 0) {
+			var articleTitles = await columnRepository.GetArticleTitlesAsync(duplicatedArticles.Select(x => x.Key).ToArray(), cancellationToken);
+			var duplicateMessage = string.Join("；", duplicatedArticles.Select(group => {
+				var articleTitle = articleTitles.TryGetValue(group.Key, out var title) ? title : $"ID {group.Key}";
+				return $"{string.Join(" 和 ", group.Select(x => $"目录：{x.CatalogTitle}"))} 引用了相同的文章：{articleTitle}";
+			}));
+			Guard.Against(true, ErrorCodes.ColumnCatalogArticleDuplicate, duplicateMessage);
+		}
 
 		if (articleIds.Length > 0) {
-			await columnRepository.ValidateArticleIdsAsync(articleIds.Distinct().ToArray(), cancellationToken);
+			var distinctArticleIds = articleIds.Distinct().ToArray();
+			await columnRepository.ValidateArticleIdsAsync(distinctArticleIds, cancellationToken);
+
+			var occupiedArticleIds = await columnRepository.FilterOccupiedArticleIdsAsync(command.ColumnId,
+				distinctArticleIds, cancellationToken);
+			Guard.Against(occupiedArticleIds.Count > 0, ErrorCodes.ColumnCatalogArticleOccupied,
+				$"以下文章 ID 已被其他专栏占用：{string.Join(", ", occupiedArticleIds)}");
 		}
 
 		await unitOfWork.BeginTransactionAsync(cancellationToken);

@@ -1,3 +1,209 @@
+<template>
+  <div class="flex">
+    <aside
+      v-if="catalogsVisible"
+      class="column-sidebar fixed bottom-0 z-[90] overflow-y-auto border-r border-[#3ecf9a]/14 bg-white p-4 dark:border-[#334155] dark:bg-[#2c333e]"
+    >
+      <div class="pt-6" :class="[catalogsVisible ? 'block' : 'hidden']">
+        <h3 class="mb-3 text-sm font-bold text-[#0d3d2d] dark:text-white">目录</h3>
+        <div v-for="cat in catalogs" :key="cat.id" class="mb-2">
+          <button
+            class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-bold text-[#0d3d2d] dark:text-white hover:bg-[#3ecf9a]/8"
+            @click="
+              activeKeys.includes(cat.id)
+                ? (activeKeys = activeKeys.filter(k => k !== cat.id))
+                : activeKeys.push(cat.id)
+            "
+          >
+            <span class="text-xs transition-transform" :class="[activeKeys.includes(cat.id) ? 'rotate-90' : '']">
+              ▶
+            </span>
+            {{ cat.title }}
+          </button>
+          <ul v-if="activeKeys.includes(cat.id)" class="ml-5 mt-1 space-y-1">
+            <li v-for="child in cat.children" :key="child.articleId">
+              <button
+                class="block w-full rounded-lg px-2 py-1 text-left text-xs text-[#557468] dark:text-[#cbd5e1] hover:bg-[#3ecf9a]/8 transition-colors truncate"
+                :class="[
+                  route.query.articleId === String(child.articleId)
+                    ? 'bg-[#3ecf9a]/12 text-[#3ecf9a] font-bold dark:text-[#539dfd]'
+                    : ''
+                ]"
+                @click="goColumnArticle(child.articleId)"
+              >
+                {{ child.title }}
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <button
+      class="column-sidebar-toggle fixed z-[91] flex h-8 w-8 items-center justify-center rounded-full border border-[#3ecf9a]/14 bg-white/92 text-sm text-[#557468] shadow-sm hover:text-[#3ecf9a] dark:bg-[#2c333e]/92 dark:text-[#cbd5e1] dark:border-[#334155]"
+      :class="[catalogsVisible ? 'column-sidebar-toggle-open' : 'left-4']"
+      @click="toggleCatalogs"
+    >
+      {{ catalogsVisible ? '◀' : '▶' }}
+    </button>
+
+    <div
+      v-if="catalogsVisible"
+      class="column-sidebar-overlay fixed inset-0 z-[89] bg-black/30 sm:hidden"
+      @click="catalogsVisible = false"
+    />
+
+    <main
+      class="w-full px-4 md:px-6 py-4"
+      :class="[catalogsVisible ? 'sm:ml-[320px] sm:w-[calc(100%-320px)]' : '']"
+    >
+      <div class="mx-auto grid max-w-screen-2xl grid-cols-1 gap-7 lg:grid-cols-4">
+        <div
+          class="mt-6 col-span-1 mb-3"
+          :class="desktopTocVisible && hasTocHeadings ? 'lg:col-span-3' : 'lg:col-span-4'"
+        >
+          <div v-if="loading" class="animate-pulse space-y-4">
+            <div class="h-10 w-3/5 rounded-xl bg-[#3ecf9a]/8 dark:bg-white/8"></div>
+            <div class="h-4 w-2/5 rounded bg-gray-200 dark:bg-white/5"></div>
+            <div class="h-[400px] rounded-2xl bg-white/80 dark:bg-white/5"></div>
+          </div>
+
+          <template v-else-if="article.content">
+            <div
+              class="mb-3 rounded-lg border border-[#3ecf9a]/14 bg-white/84 p-5 dark:border-[#334155] dark:bg-[#2c333e]/72"
+            >
+              <h1 class="mb-3 text-3xl font-black text-[#0d3d2d] dark:text-white">{{ article.title }}</h1>
+
+              <div v-if="article.tags && article.tags.length" class="mb-4 flex flex-wrap gap-2">
+                <ATooltip v-for="tag in article.tags" :key="tag.id" title="标签">
+                  <span
+                    class="cursor-pointer rounded-md bg-[#3ecf9a]/12 px-2.5 py-0.5 text-xs font-medium text-[#15956b] dark:text-[#539dfd] hover:bg-[#3ecf9a]/20"
+                  >
+                    # {{ tag.name }}
+                  </span>
+                </ATooltip>
+              </div>
+
+              <div class="mb-5 flex flex-wrap items-center gap-3 text-xs text-[#557468] dark:text-[#cbd5e1]">
+                <span class="flex items-center">
+                  <CalendarOutlined class="mr-1 w-3.5 h-3.5" />
+                  发布时间&nbsp;{{ formatDateTime(article.createTime) }}
+                </span>
+                <span class="flex items-center">
+                  <EyeOutlined class="mr-1 w-3.5 h-3.5" />
+                  阅读人次&nbsp;{{ article.readNum }}
+                </span>
+                <span class="flex items-center">
+                  <FileTextOutlined class="mr-1 w-3.5 h-3.5" />
+                  总字数&nbsp;{{ article.totalWords }}
+                </span>
+                <span class="flex items-center">
+                  <ClockCircleOutlined class="mr-1 w-3.5 h-3.5" />
+                  阅读耗时&nbsp;{{ article.readTime }}
+                </span>
+              </div>
+
+              <article>
+                <div class="mt-5 leading-relaxed article-content" v-html="renderedContent"></div>
+              </article>
+
+              <div class="flex items-center text-sm mt-5 mb-5 text-[#557468] dark:text-[#cbd5e1]">
+                最后编辑于 {{ formatDateTime(article.updateTime) }}
+              </div>
+
+              <div class="mt-6 mb-6">
+                <div
+                  class="flex items-start gap-3 p-4 rounded-xl border shadow-sm bg-[#f0faf5]/80 text-[#557468] border-[#3ecf9a]/14 dark:bg-[#2c333e]/60 dark:text-[#cbd5e1] dark:border-[#334155]"
+                >
+                  <CopyrightOutlined class="w-5 h-5 text-[#3ecf9a] dark:text-[#539dfd] mt-0.5 shrink-0" />
+                  <div>
+                    <p class="text-sm font-bold uppercase tracking-wide text-[#557468] dark:text-[#cbd5e1] mb-1">
+                      版权声明
+                    </p>
+                    <p class="whitespace-pre-line text-sm leading-relaxed">
+                      {{ copyrightDeclaration }}
+                    </p>
+                    <div class="mt-2 text-xs flex items-start gap-1 text-[#557468] dark:text-[#cbd5e1]">
+                      <LinkOutlined class="mt-[2px] w-3.5 h-3.5 shrink-0" />
+                      <span class="text-sm shrink-0">原文链接：</span>
+                      <a
+                        :href="currentArticleUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="text-sm text-[#3ecf9a] dark:text-[#539dfd] hover:underline break-all"
+                      >
+                        {{ currentArticleUrl }}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <nav v-if="preNext" class="flex gap-4 mt-7">
+                <div class="flex-1">
+                  <button
+                    v-if="preNext.preArticle"
+                    class="flex w-full flex-col rounded-lg border border-[#3ecf9a]/14 bg-white/72 p-4 text-left transition-colors hover:border-[#3ecf9a]/40 dark:bg-[#2c333e]/72 dark:border-[#334155]"
+                    @click="goColumnArticle(preNext.preArticle.articleId)"
+                  >
+                    <div class="text-xs text-[#557468] dark:text-[#cbd5e1]">
+                      <LeftOutlined class="mr-1 w-3 h-3" />
+                      上一篇
+                    </div>
+                    <div class="mt-1 text-sm font-medium text-[#0d3d2d] dark:text-white line-clamp-1">
+                      {{ preNext.preArticle.articleTitle }}
+                    </div>
+                  </button>
+                </div>
+                <div class="flex-1 text-right">
+                  <button
+                    v-if="preNext.nextArticle"
+                    class="flex w-full flex-col rounded-lg border border-[#3ecf9a]/14 bg-white/72 p-4 text-right transition-colors hover:border-[#3ecf9a]/40 dark:bg-[#2c333e]/72 dark:border-[#334155]"
+                    @click="goColumnArticle(preNext.nextArticle.articleId)"
+                  >
+                    <div class="text-xs text-[#557468] dark:text-[#cbd5e1]">
+                      下一篇
+                      <RightOutlined class="ml-1 w-3 h-3" />
+                    </div>
+                    <div class="mt-1 text-sm font-medium text-[#0d3d2d] dark:text-white line-clamp-1">
+                      {{ preNext.nextArticle.articleTitle }}
+                    </div>
+                  </button>
+                </div>
+              </nav>
+            </div>
+
+            <SurferComment />
+          </template>
+        </div>
+
+        <div
+          v-if="!isMobile && desktopTocVisible && hasTocHeadings"
+          class="col-span-1 mt-6 hidden md:block"
+        >
+          <SurferToc :key="route.query.articleId as string" :header-offset="150" />
+        </div>
+      </div>
+    </main>
+
+    <ADrawer
+      v-model:open="mobileTocVisible"
+      title="文章目录"
+      placement="right"
+      width="86%"
+      class="column-mobile-toc-drawer"
+    >
+      <SurferToc
+        v-if="mobileTocVisible"
+        :key="mobileTocRenderKey"
+        :header-offset="80"
+        :pinnable="false"
+        @item-click="mobileTocVisible = false"
+      />
+    </ADrawer>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -529,212 +735,6 @@ onBeforeUnmount(() => {
   window.removeEventListener('blog-surfer:toggle-toc', handleToggleToc);
 });
 </script>
-
-<template>
-  <div class="flex">
-    <aside
-      v-if="catalogsVisible"
-      class="column-sidebar fixed bottom-0 z-[90] overflow-y-auto border-r border-[#3ecf9a]/14 bg-white p-4 dark:border-[#334155] dark:bg-[#2c333e]"
-    >
-      <div class="pt-6" :class="[catalogsVisible ? 'block' : 'hidden']">
-        <h3 class="mb-3 text-sm font-bold text-[#0d3d2d] dark:text-white">目录</h3>
-        <div v-for="cat in catalogs" :key="cat.id" class="mb-2">
-          <button
-            class="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm font-bold text-[#0d3d2d] dark:text-white hover:bg-[#3ecf9a]/8"
-            @click="
-              activeKeys.includes(cat.id)
-                ? (activeKeys = activeKeys.filter(k => k !== cat.id))
-                : activeKeys.push(cat.id)
-            "
-          >
-            <span class="text-xs transition-transform" :class="[activeKeys.includes(cat.id) ? 'rotate-90' : '']">
-              ▶
-            </span>
-            {{ cat.title }}
-          </button>
-          <ul v-if="activeKeys.includes(cat.id)" class="ml-5 mt-1 space-y-1">
-            <li v-for="child in cat.children" :key="child.articleId">
-              <button
-                class="block w-full rounded-lg px-2 py-1 text-left text-xs text-[#557468] dark:text-[#cbd5e1] hover:bg-[#3ecf9a]/8 transition-colors truncate"
-                :class="[
-                  route.query.articleId === String(child.articleId)
-                    ? 'bg-[#3ecf9a]/12 text-[#3ecf9a] font-bold dark:text-[#539dfd]'
-                    : ''
-                ]"
-                @click="goColumnArticle(child.articleId)"
-              >
-                {{ child.title }}
-              </button>
-            </li>
-          </ul>
-        </div>
-      </div>
-    </aside>
-
-    <button
-      class="column-sidebar-toggle fixed z-[91] flex h-8 w-8 items-center justify-center rounded-full border border-[#3ecf9a]/14 bg-white/92 text-sm text-[#557468] shadow-sm hover:text-[#3ecf9a] dark:bg-[#2c333e]/92 dark:text-[#cbd5e1] dark:border-[#334155]"
-      :class="[catalogsVisible ? 'column-sidebar-toggle-open' : 'left-4']"
-      @click="toggleCatalogs"
-    >
-      {{ catalogsVisible ? '◀' : '▶' }}
-    </button>
-
-    <div
-      v-if="catalogsVisible"
-      class="column-sidebar-overlay fixed inset-0 z-[89] bg-black/30 sm:hidden"
-      @click="catalogsVisible = false"
-    />
-
-    <main
-      class="w-full px-4 md:px-6 py-4"
-      :class="[catalogsVisible ? 'sm:ml-[320px] sm:w-[calc(100%-320px)]' : '']"
-    >
-      <div class="mx-auto grid max-w-screen-2xl grid-cols-1 gap-7 lg:grid-cols-4">
-        <div
-          class="mt-6 col-span-1 mb-3"
-          :class="desktopTocVisible && hasTocHeadings ? 'lg:col-span-3' : 'lg:col-span-4'"
-        >
-          <div v-if="loading" class="animate-pulse space-y-4">
-            <div class="h-10 w-3/5 rounded-xl bg-[#3ecf9a]/8 dark:bg-white/8"></div>
-            <div class="h-4 w-2/5 rounded bg-gray-200 dark:bg-white/5"></div>
-            <div class="h-[400px] rounded-2xl bg-white/80 dark:bg-white/5"></div>
-          </div>
-
-          <template v-else-if="article.content">
-            <div
-              class="mb-3 rounded-lg border border-[#3ecf9a]/14 bg-white/84 p-5 dark:border-[#334155] dark:bg-[#2c333e]/72"
-            >
-              <h1 class="mb-3 text-3xl font-black text-[#0d3d2d] dark:text-white">{{ article.title }}</h1>
-
-              <div v-if="article.tags && article.tags.length" class="mb-4 flex flex-wrap gap-2">
-                <ATooltip v-for="tag in article.tags" :key="tag.id" title="标签">
-                  <span
-                    class="cursor-pointer rounded-md bg-[#3ecf9a]/12 px-2.5 py-0.5 text-xs font-medium text-[#15956b] dark:text-[#539dfd] hover:bg-[#3ecf9a]/20"
-                  >
-                    # {{ tag.name }}
-                  </span>
-                </ATooltip>
-              </div>
-
-              <div class="mb-5 flex flex-wrap items-center gap-3 text-xs text-[#557468] dark:text-[#cbd5e1]">
-                <span class="flex items-center">
-                  <CalendarOutlined class="mr-1 w-3.5 h-3.5" />
-                  发布时间&nbsp;{{ formatDateTime(article.createTime) }}
-                </span>
-                <span class="flex items-center">
-                  <EyeOutlined class="mr-1 w-3.5 h-3.5" />
-                  阅读人次&nbsp;{{ article.readNum }}
-                </span>
-                <span class="flex items-center">
-                  <FileTextOutlined class="mr-1 w-3.5 h-3.5" />
-                  总字数&nbsp;{{ article.totalWords }}
-                </span>
-                <span class="flex items-center">
-                  <ClockCircleOutlined class="mr-1 w-3.5 h-3.5" />
-                  阅读耗时&nbsp;{{ article.readTime }}
-                </span>
-              </div>
-
-              <article>
-                <div class="mt-5 leading-relaxed article-content" v-html="renderedContent"></div>
-              </article>
-
-              <div class="flex items-center text-sm mt-5 mb-5 text-[#557468] dark:text-[#cbd5e1]">
-                最后编辑于 {{ formatDateTime(article.updateTime) }}
-              </div>
-
-              <div class="mt-6 mb-6">
-                <div
-                  class="flex items-start gap-3 p-4 rounded-xl border shadow-sm bg-[#f0faf5]/80 text-[#557468] border-[#3ecf9a]/14 dark:bg-[#2c333e]/60 dark:text-[#cbd5e1] dark:border-[#334155]"
-                >
-                  <CopyrightOutlined class="w-5 h-5 text-[#3ecf9a] dark:text-[#539dfd] mt-0.5 shrink-0" />
-                  <div>
-                    <p class="text-sm font-bold uppercase tracking-wide text-[#557468] dark:text-[#cbd5e1] mb-1">
-                      版权声明
-                    </p>
-                    <p class="whitespace-pre-line text-sm leading-relaxed">
-                      {{ copyrightDeclaration }}
-                    </p>
-                    <div class="mt-2 text-xs flex items-start gap-1 text-[#557468] dark:text-[#cbd5e1]">
-                      <LinkOutlined class="mt-[2px] w-3.5 h-3.5 shrink-0" />
-                      <span class="text-sm shrink-0">原文链接：</span>
-                      <a
-                        :href="currentArticleUrl"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="text-sm text-[#3ecf9a] dark:text-[#539dfd] hover:underline break-all"
-                      >
-                        {{ currentArticleUrl }}
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <nav v-if="preNext" class="flex gap-4 mt-7">
-                <div class="flex-1">
-                  <button
-                    v-if="preNext.preArticle"
-                    class="flex w-full flex-col rounded-lg border border-[#3ecf9a]/14 bg-white/72 p-4 text-left transition-colors hover:border-[#3ecf9a]/40 dark:bg-[#2c333e]/72 dark:border-[#334155]"
-                    @click="goColumnArticle(preNext.preArticle.articleId)"
-                  >
-                    <div class="text-xs text-[#557468] dark:text-[#cbd5e1]">
-                      <LeftOutlined class="mr-1 w-3 h-3" />
-                      上一篇
-                    </div>
-                    <div class="mt-1 text-sm font-medium text-[#0d3d2d] dark:text-white line-clamp-1">
-                      {{ preNext.preArticle.articleTitle }}
-                    </div>
-                  </button>
-                </div>
-                <div class="flex-1 text-right">
-                  <button
-                    v-if="preNext.nextArticle"
-                    class="flex w-full flex-col rounded-lg border border-[#3ecf9a]/14 bg-white/72 p-4 text-right transition-colors hover:border-[#3ecf9a]/40 dark:bg-[#2c333e]/72 dark:border-[#334155]"
-                    @click="goColumnArticle(preNext.nextArticle.articleId)"
-                  >
-                    <div class="text-xs text-[#557468] dark:text-[#cbd5e1]">
-                      下一篇
-                      <RightOutlined class="ml-1 w-3 h-3" />
-                    </div>
-                    <div class="mt-1 text-sm font-medium text-[#0d3d2d] dark:text-white line-clamp-1">
-                      {{ preNext.nextArticle.articleTitle }}
-                    </div>
-                  </button>
-                </div>
-              </nav>
-            </div>
-
-            <SurferComment />
-          </template>
-        </div>
-
-        <div
-          v-if="!isMobile && desktopTocVisible && hasTocHeadings"
-          class="col-span-1 mt-6 hidden md:block"
-        >
-          <SurferToc :key="route.query.articleId as string" :header-offset="150" />
-        </div>
-      </div>
-    </main>
-
-    <ADrawer
-      v-model:open="mobileTocVisible"
-      title="文章目录"
-      placement="right"
-      width="86%"
-      class="column-mobile-toc-drawer"
-    >
-      <SurferToc
-        v-if="mobileTocVisible"
-        :key="mobileTocRenderKey"
-        :header-offset="80"
-        :pinnable="false"
-        @item-click="mobileTocVisible = false"
-      />
-    </ADrawer>
-  </div>
-</template>
 
 <style scoped>
 .column-sidebar {

@@ -1,3 +1,306 @@
+<template>
+  <div class="gallery-admin-page">
+    <ACard :bordered="false" class="page-card">
+      <div v-if="activeTab === 'images'" class="gallery-toolbar-row">
+        <AInput
+          v-model:value="imageKeyword"
+          allow-clear
+          placeholder="搜索图片名称、分类、分辨率"
+          class="search-input"
+          @input="scheduleImageSearch"
+          @press-enter="loadImages"
+        >
+          <template #prefix><SearchOutlined /></template>
+        </AInput>
+        <div class="default-bucket-bar">
+          <span>上传默认桶</span>
+          <ASelect
+            :value="defaultBucketName"
+            allow-clear
+            :loading="bucketLoading"
+            placeholder="请选择默认上传桶"
+            class="default-bucket-select"
+            @change="saveDefaultBucket"
+          >
+            <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
+              {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
+            </ASelectOption>
+          </ASelect>
+        </div>
+        <AButton type="primary" ghost :disabled="isDemoAdmin" @click="openImageModal">
+          <UploadOutlined />
+          上传图片
+        </AButton>
+      </div>
+      <div class="gallery-tabs-wrapper">
+        <ATabs v-model:active-key="activeTab">
+        <ATabPane key="images" tab="图片管理">
+          <ATable
+            row-key="id"
+            :loading="loading"
+            :columns="imageColumns"
+            :data-source="imageData"
+            :pagination="false"
+            :size="tableSize"
+            :scroll="{ x: tableScrollX }"
+            :row-selection="{ selectedRowKeys: selectedImageRowKeys, onChange: (keys: (string | number)[]) => (selectedImageRowKeys = keys.map(String)) }"
+          >
+            <template #title>
+              <ASpace v-if="selectedImageRowKeys.length">
+                <span>已选择 {{ selectedImageRowKeys.length }} 张</span>
+                <AButton danger size="small" :disabled="isDemoAdmin" @click="confirmDeleteImages(imageData.filter(item => selectedImageRowKeys.includes(item.id)))">
+                  批量删除
+                </AButton>
+              </ASpace>
+            </template>
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'url'">
+                <AImage :src="record.url" :width="72" :height="46" />
+              </template>
+              <template v-else-if="column.key === 'link'">
+                <ATooltip :title="record.url">
+                  <AButton type="link" size="small" class="copy-link-button" @click="copyImageUrl(record.url)">
+                    <CopyOutlined />
+                    复制链接
+                  </AButton>
+                </ATooltip>
+              </template>
+              <template v-else-if="column.key === 'enabled'">
+                <ATag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '停用' }}</ATag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <ASpace>
+                  <AButton
+                    type="link"
+                    size="small"
+                    :disabled="isDemoAdmin"
+                    @click="openEditImage(record as GalleryImageItem)"
+                  >
+                    <EditOutlined />
+                    编辑
+                  </AButton>
+                  <AButton
+                    type="link"
+                    size="small"
+                    danger
+                    :disabled="isDemoAdmin"
+                    @click="confirmDeleteImage(record as GalleryImageItem)"
+                  >
+                    <DeleteOutlined />
+                    删除
+                  </AButton>
+                </ASpace>
+              </template>
+            </template>
+          </ATable>
+        </ATabPane>
+
+        <ATabPane key="categories" tab="分类管理">
+          <div class="table-toolbar category-toolbar">
+            <AButton type="primary" ghost :disabled="isDemoAdmin" @click="openCategoryModal">
+              <PlusOutlined />
+              新增分类
+            </AButton>
+          </div>
+          <ATable
+            row-key="id"
+            :loading="loading"
+            :columns="categoryColumns"
+            :data-source="categoryData"
+            :pagination="false"
+            :size="tableSize"
+            :scroll="{ x: tableScrollX }"
+          >
+            <template #bodyCell="{ column, record, index }">
+              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+              <template v-else-if="column.key === 'enabled'">
+                <ATag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '停用' }}</ATag>
+              </template>
+              <template v-else-if="column.key === 'action'">
+                <ASpace>
+                  <AButton
+                    type="link"
+                    size="small"
+                    :disabled="isDemoAdmin"
+                    @click="openEditCategory(record as GalleryCategoryItem)"
+                  >
+                    <EditOutlined />
+                    编辑
+                  </AButton>
+                  <AButton
+                    type="link"
+                    size="small"
+                    danger
+                    :disabled="isDemoAdmin"
+                    @click="confirmDeleteCategory(record as GalleryCategoryItem)"
+                  >
+                    <DeleteOutlined />
+                    删除
+                  </AButton>
+                </ASpace>
+              </template>
+            </template>
+          </ATable>
+        </ATabPane>
+
+        <ATabPane key="duplicates" tab="查重管理">
+          <div class="duplicate-toolbar">
+            <ASpace wrap>
+              <span>查重条件：</span>
+              <ACheckboxGroup v-model:value="duplicateConditions" @change="handleDuplicateConditionChange">
+                <ACheckbox value="resolution">分辨率</ACheckbox>
+                <ACheckbox value="ratio">比例</ACheckbox>
+                <ACheckbox value="size">大小</ACheckbox>
+              </ACheckboxGroup>
+            </ASpace>
+            <ASpace wrap>
+              <span>重复组 {{ duplicateGroups.length }} 组，重复图片 {{ duplicateImageCount }} 张</span>
+              <AButton size="small" :disabled="!duplicateRows.length" @click="selectDuplicateExtras">每组保留一张</AButton>
+            </ASpace>
+          </div>
+          <AAlert
+            v-if="!duplicateConditions.length"
+            message="请至少选择一个查重条件"
+            type="warning"
+            show-icon
+            class="duplicate-alert"
+          />
+          <ATable
+            row-key="id"
+            :loading="loading"
+            :columns="duplicateColumns"
+            :data-source="duplicateRows"
+            :pagination="false"
+            :size="tableSize"
+            :scroll="{ x: tableScrollX }"
+            :row-selection="{
+              selectedRowKeys: duplicateSelectedRowKeys,
+              onChange: (keys: (string | number)[]) => (duplicateSelectedRowKeys = keys.map(String))
+            }"
+          >
+            <template #title>
+              <ASpace>
+                <span>已选择 {{ duplicateSelectedRowKeys.length }} 张</span>
+                <AButton
+                  danger
+                  size="small"
+                  :disabled="isDemoAdmin || !duplicateSelectedRowKeys.length"
+                  @click="confirmDeleteSelectedDuplicates"
+                >
+                  批量删除
+                </AButton>
+              </ASpace>
+            </template>
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'url'">
+                <AImage :src="record.url" :width="72" :height="46" />
+              </template>
+            </template>
+          </ATable>
+        </ATabPane>
+        </ATabs>
+      </div>
+    </ACard>
+
+    <AModal v-model:open="categoryModalOpen" title="画廊分类" :width="modalWidth" destroy-on-close>
+      <AForm :model="categoryForm" layout="vertical">
+        <AFormItem label="分类名称" required>
+          <AInput v-model:value="categoryForm.name" placeholder="请输入分类名称" />
+        </AFormItem>
+        <AFormItem label="描述">
+          <ATextarea v-model:value="categoryForm.description" placeholder="请输入分类描述" />
+        </AFormItem>
+        <AFormItem label="排序"><AInputNumber v-model:value="categoryForm.sort" class="w-full" /></AFormItem>
+        <AFormItem label="启用状态"><ASwitch v-model:checked="categoryForm.enabled" /></AFormItem>
+      </AForm>
+      <template #footer>
+        <AButton @click="categoryModalOpen = false">取消</AButton>
+        <AButton type="primary" :disabled="isDemoAdmin" @click="handleCategorySubmit">保存</AButton>
+      </template>
+    </AModal>
+
+    <AModal v-model:open="imageModalOpen" title="画廊图片" :width="modalWidth" destroy-on-close>
+      <AForm :model="imageForm" layout="vertical">
+        <AFormItem v-if="!isBatchLocalUpload" label="图片名称" required>
+          <AInput v-model:value="imageForm.name" placeholder="请输入图片名称" />
+        </AFormItem>
+        <AFormItem label="图片来源" required>
+          <ARadioGroup v-model:value="imageForm.sourceType" button-style="solid" @change="handleSourceTypeChange">
+            <ARadioButton value="local">本地上传</ARadioButton>
+            <ARadioButton value="external">外部引用</ARadioButton>
+          </ARadioGroup>
+        </AFormItem>
+        <AFormItem v-if="imageForm.sourceType === 'local'" label="存储桶" required>
+          <ASelect v-model:value="imageForm.bucketName" :loading="bucketLoading" placeholder="请选择存储桶">
+            <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
+              {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
+            </ASelectOption>
+          </ASelect>
+        </AFormItem>
+        <AFormItem v-if="imageForm.sourceType === 'local'" label="上传图片" required>
+          <AUpload
+            v-model:file-list="uploadFileList"
+            accept="image/*"
+            :multiple="!editingImage"
+            :max-count="editingImage ? 1 : undefined"
+            :show-upload-list="true"
+            :before-upload="handleBeforeLocalUpload"
+            @change="handleLocalUpload"
+          >
+            <AButton :loading="uploadLoading">
+              <UploadOutlined />
+              选择本地图片
+            </AButton>
+          </AUpload>
+          <div v-if="isBatchLocalUpload" class="generated-url">
+            将按文件名创建 {{ selectedLocalFiles.length }} 条画廊记录
+          </div>
+          <div v-else-if="imageForm.url" class="generated-url">链接已生成：{{ imageForm.url }}</div>
+        </AFormItem>
+        <AFormItem v-else label="图片链接" required>
+          <AInput v-model:value="imageForm.url" placeholder="请输入外部图片链接" @input="scheduleExternalImageMetadata" @blur="fillExternalImageMetadata" @press-enter="fillExternalImageMetadata" />
+        </AFormItem>
+        <AFormItem label="分类" required>
+          <ASelect v-model:value="imageForm.categoryId" placeholder="请选择分类">
+            <ASelectOption v-for="item in categoryOptions" :key="item.id" :value="item.id">
+              {{ item.name }}
+            </ASelectOption>
+          </ASelect>
+        </AFormItem>
+        <ARow v-if="!isBatchLocalUpload" :gutter="16">
+          <ACol :span="6">
+            <AFormItem label="分辨率"><AInput v-model:value="imageForm.resolution" placeholder="例如 4K" /></AFormItem>
+          </ACol>
+          <ACol :span="6">
+            <AFormItem label="比例"><AInput v-model:value="imageForm.ratio" placeholder="例如 16:9" /></AFormItem>
+          </ACol>
+          <ACol :span="6">
+            <AFormItem label="时间">
+              <ADatePicker
+                v-model:value="imageForm.time"
+                value-format="YYYY-MM-DD"
+                class="w-full"
+                placeholder="请选择时间"
+              />
+            </AFormItem>
+          </ACol>
+          <ACol :span="6">
+            <AFormItem label="大小（MB）">
+              <AInputNumber v-model:value="imageForm.size" :min="0" class="w-full" />
+            </AFormItem>
+          </ACol>
+        </ARow>
+        <AFormItem label="启用状态"><ASwitch v-model:checked="imageForm.enabled" /></AFormItem>
+      </AForm>
+      <template #footer>
+        <AButton @click="imageModalOpen = false">取消</AButton>
+        <AButton type="primary" :disabled="isDemoAdmin" @click="handleImageSubmit">保存</AButton>
+      </template>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import type { TableColumnsType, UploadChangeParam, UploadProps } from 'ant-design-vue';
@@ -739,309 +1042,6 @@ onBeforeUnmount(() => {
   if (imageSearchTimer) clearTimeout(imageSearchTimer);
 });
 </script>
-
-<template>
-  <div class="gallery-admin-page">
-    <ACard :bordered="false" class="page-card">
-      <div v-if="activeTab === 'images'" class="gallery-toolbar-row">
-        <AInput
-          v-model:value="imageKeyword"
-          allow-clear
-          placeholder="搜索图片名称、分类、分辨率"
-          class="search-input"
-          @input="scheduleImageSearch"
-          @press-enter="loadImages"
-        >
-          <template #prefix><SearchOutlined /></template>
-        </AInput>
-        <div class="default-bucket-bar">
-          <span>上传默认桶</span>
-          <ASelect
-            :value="defaultBucketName"
-            allow-clear
-            :loading="bucketLoading"
-            placeholder="请选择默认上传桶"
-            class="default-bucket-select"
-            @change="saveDefaultBucket"
-          >
-            <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
-              {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
-            </ASelectOption>
-          </ASelect>
-        </div>
-        <AButton type="primary" ghost :disabled="isDemoAdmin" @click="openImageModal">
-          <UploadOutlined />
-          上传图片
-        </AButton>
-      </div>
-      <div class="gallery-tabs-wrapper">
-        <ATabs v-model:active-key="activeTab">
-        <ATabPane key="images" tab="图片管理">
-          <ATable
-            row-key="id"
-            :loading="loading"
-            :columns="imageColumns"
-            :data-source="imageData"
-            :pagination="false"
-            :size="tableSize"
-            :scroll="{ x: tableScrollX }"
-            :row-selection="{ selectedRowKeys: selectedImageRowKeys, onChange: (keys: (string | number)[]) => (selectedImageRowKeys = keys.map(String)) }"
-          >
-            <template #title>
-              <ASpace v-if="selectedImageRowKeys.length">
-                <span>已选择 {{ selectedImageRowKeys.length }} 张</span>
-                <AButton danger size="small" :disabled="isDemoAdmin" @click="confirmDeleteImages(imageData.filter(item => selectedImageRowKeys.includes(item.id)))">
-                  批量删除
-                </AButton>
-              </ASpace>
-            </template>
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'url'">
-                <AImage :src="record.url" :width="72" :height="46" />
-              </template>
-              <template v-else-if="column.key === 'link'">
-                <ATooltip :title="record.url">
-                  <AButton type="link" size="small" class="copy-link-button" @click="copyImageUrl(record.url)">
-                    <CopyOutlined />
-                    复制链接
-                  </AButton>
-                </ATooltip>
-              </template>
-              <template v-else-if="column.key === 'enabled'">
-                <ATag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '停用' }}</ATag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <ASpace>
-                  <AButton
-                    type="link"
-                    size="small"
-                    :disabled="isDemoAdmin"
-                    @click="openEditImage(record as GalleryImageItem)"
-                  >
-                    <EditOutlined />
-                    编辑
-                  </AButton>
-                  <AButton
-                    type="link"
-                    size="small"
-                    danger
-                    :disabled="isDemoAdmin"
-                    @click="confirmDeleteImage(record as GalleryImageItem)"
-                  >
-                    <DeleteOutlined />
-                    删除
-                  </AButton>
-                </ASpace>
-              </template>
-            </template>
-          </ATable>
-        </ATabPane>
-
-        <ATabPane key="categories" tab="分类管理">
-          <div class="table-toolbar category-toolbar">
-            <AButton type="primary" ghost :disabled="isDemoAdmin" @click="openCategoryModal">
-              <PlusOutlined />
-              新增分类
-            </AButton>
-          </div>
-          <ATable
-            row-key="id"
-            :loading="loading"
-            :columns="categoryColumns"
-            :data-source="categoryData"
-            :pagination="false"
-            :size="tableSize"
-            :scroll="{ x: tableScrollX }"
-          >
-            <template #bodyCell="{ column, record, index }">
-              <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-              <template v-else-if="column.key === 'enabled'">
-                <ATag :color="record.enabled ? 'green' : 'default'">{{ record.enabled ? '启用' : '停用' }}</ATag>
-              </template>
-              <template v-else-if="column.key === 'action'">
-                <ASpace>
-                  <AButton
-                    type="link"
-                    size="small"
-                    :disabled="isDemoAdmin"
-                    @click="openEditCategory(record as GalleryCategoryItem)"
-                  >
-                    <EditOutlined />
-                    编辑
-                  </AButton>
-                  <AButton
-                    type="link"
-                    size="small"
-                    danger
-                    :disabled="isDemoAdmin"
-                    @click="confirmDeleteCategory(record as GalleryCategoryItem)"
-                  >
-                    <DeleteOutlined />
-                    删除
-                  </AButton>
-                </ASpace>
-              </template>
-            </template>
-          </ATable>
-        </ATabPane>
-
-        <ATabPane key="duplicates" tab="查重管理">
-          <div class="duplicate-toolbar">
-            <ASpace wrap>
-              <span>查重条件：</span>
-              <ACheckboxGroup v-model:value="duplicateConditions" @change="handleDuplicateConditionChange">
-                <ACheckbox value="resolution">分辨率</ACheckbox>
-                <ACheckbox value="ratio">比例</ACheckbox>
-                <ACheckbox value="size">大小</ACheckbox>
-              </ACheckboxGroup>
-            </ASpace>
-            <ASpace wrap>
-              <span>重复组 {{ duplicateGroups.length }} 组，重复图片 {{ duplicateImageCount }} 张</span>
-              <AButton size="small" :disabled="!duplicateRows.length" @click="selectDuplicateExtras">每组保留一张</AButton>
-            </ASpace>
-          </div>
-          <AAlert
-            v-if="!duplicateConditions.length"
-            message="请至少选择一个查重条件"
-            type="warning"
-            show-icon
-            class="duplicate-alert"
-          />
-          <ATable
-            row-key="id"
-            :loading="loading"
-            :columns="duplicateColumns"
-            :data-source="duplicateRows"
-            :pagination="false"
-            :size="tableSize"
-            :scroll="{ x: tableScrollX }"
-            :row-selection="{
-              selectedRowKeys: duplicateSelectedRowKeys,
-              onChange: (keys: (string | number)[]) => (duplicateSelectedRowKeys = keys.map(String))
-            }"
-          >
-            <template #title>
-              <ASpace>
-                <span>已选择 {{ duplicateSelectedRowKeys.length }} 张</span>
-                <AButton
-                  danger
-                  size="small"
-                  :disabled="isDemoAdmin || !duplicateSelectedRowKeys.length"
-                  @click="confirmDeleteSelectedDuplicates"
-                >
-                  批量删除
-                </AButton>
-              </ASpace>
-            </template>
-            <template #bodyCell="{ column, record }">
-              <template v-if="column.key === 'url'">
-                <AImage :src="record.url" :width="72" :height="46" />
-              </template>
-            </template>
-          </ATable>
-        </ATabPane>
-        </ATabs>
-      </div>
-    </ACard>
-
-    <AModal v-model:open="categoryModalOpen" title="画廊分类" :width="modalWidth" destroy-on-close>
-      <AForm :model="categoryForm" layout="vertical">
-        <AFormItem label="分类名称" required>
-          <AInput v-model:value="categoryForm.name" placeholder="请输入分类名称" />
-        </AFormItem>
-        <AFormItem label="描述">
-          <ATextarea v-model:value="categoryForm.description" placeholder="请输入分类描述" />
-        </AFormItem>
-        <AFormItem label="排序"><AInputNumber v-model:value="categoryForm.sort" class="w-full" /></AFormItem>
-        <AFormItem label="启用状态"><ASwitch v-model:checked="categoryForm.enabled" /></AFormItem>
-      </AForm>
-      <template #footer>
-        <AButton @click="categoryModalOpen = false">取消</AButton>
-        <AButton type="primary" :disabled="isDemoAdmin" @click="handleCategorySubmit">保存</AButton>
-      </template>
-    </AModal>
-
-    <AModal v-model:open="imageModalOpen" title="画廊图片" :width="modalWidth" destroy-on-close>
-      <AForm :model="imageForm" layout="vertical">
-        <AFormItem v-if="!isBatchLocalUpload" label="图片名称" required>
-          <AInput v-model:value="imageForm.name" placeholder="请输入图片名称" />
-        </AFormItem>
-        <AFormItem label="图片来源" required>
-          <ARadioGroup v-model:value="imageForm.sourceType" button-style="solid" @change="handleSourceTypeChange">
-            <ARadioButton value="local">本地上传</ARadioButton>
-            <ARadioButton value="external">外部引用</ARadioButton>
-          </ARadioGroup>
-        </AFormItem>
-        <AFormItem v-if="imageForm.sourceType === 'local'" label="存储桶" required>
-          <ASelect v-model:value="imageForm.bucketName" :loading="bucketLoading" placeholder="请选择存储桶">
-            <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
-              {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
-            </ASelectOption>
-          </ASelect>
-        </AFormItem>
-        <AFormItem v-if="imageForm.sourceType === 'local'" label="上传图片" required>
-          <AUpload
-            v-model:file-list="uploadFileList"
-            accept="image/*"
-            :multiple="!editingImage"
-            :max-count="editingImage ? 1 : undefined"
-            :show-upload-list="true"
-            :before-upload="handleBeforeLocalUpload"
-            @change="handleLocalUpload"
-          >
-            <AButton :loading="uploadLoading">
-              <UploadOutlined />
-              选择本地图片
-            </AButton>
-          </AUpload>
-          <div v-if="isBatchLocalUpload" class="generated-url">
-            将按文件名创建 {{ selectedLocalFiles.length }} 条画廊记录
-          </div>
-          <div v-else-if="imageForm.url" class="generated-url">链接已生成：{{ imageForm.url }}</div>
-        </AFormItem>
-        <AFormItem v-else label="图片链接" required>
-          <AInput v-model:value="imageForm.url" placeholder="请输入外部图片链接" @input="scheduleExternalImageMetadata" @blur="fillExternalImageMetadata" @press-enter="fillExternalImageMetadata" />
-        </AFormItem>
-        <AFormItem label="分类" required>
-          <ASelect v-model:value="imageForm.categoryId" placeholder="请选择分类">
-            <ASelectOption v-for="item in categoryOptions" :key="item.id" :value="item.id">
-              {{ item.name }}
-            </ASelectOption>
-          </ASelect>
-        </AFormItem>
-        <ARow v-if="!isBatchLocalUpload" :gutter="16">
-          <ACol :span="6">
-            <AFormItem label="分辨率"><AInput v-model:value="imageForm.resolution" placeholder="例如 4K" /></AFormItem>
-          </ACol>
-          <ACol :span="6">
-            <AFormItem label="比例"><AInput v-model:value="imageForm.ratio" placeholder="例如 16:9" /></AFormItem>
-          </ACol>
-          <ACol :span="6">
-            <AFormItem label="时间">
-              <ADatePicker
-                v-model:value="imageForm.time"
-                value-format="YYYY-MM-DD"
-                class="w-full"
-                placeholder="请选择时间"
-              />
-            </AFormItem>
-          </ACol>
-          <ACol :span="6">
-            <AFormItem label="大小（MB）">
-              <AInputNumber v-model:value="imageForm.size" :min="0" class="w-full" />
-            </AFormItem>
-          </ACol>
-        </ARow>
-        <AFormItem label="启用状态"><ASwitch v-model:checked="imageForm.enabled" /></AFormItem>
-      </AForm>
-      <template #footer>
-        <AButton @click="imageModalOpen = false">取消</AButton>
-        <AButton type="primary" :disabled="isDemoAdmin" @click="handleImageSubmit">保存</AButton>
-      </template>
-    </AModal>
-  </div>
-</template>
 
 <style scoped lang="scss">
 .gallery-admin-page {

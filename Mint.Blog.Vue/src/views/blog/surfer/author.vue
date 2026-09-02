@@ -1,56 +1,3 @@
-<script setup lang="ts">
-import { computed, ref } from 'vue';
-import { GithubOutlined, MailOutlined, QqOutlined, WechatOutlined } from '@ant-design/icons-vue';
-import { useThemeStore } from '@/store/system/theme';
-import siteProjectIcon1 from '@/assets/blog/surfer/author/img/i1.png';
-import siteProjectIcon2 from '@/assets/blog/surfer/author/img/i2.png';
-import siteProjectIcon3 from '@/assets/blog/surfer/author/img/i3.png';
-import siteProjectIcon4 from '@/assets/blog/surfer/author/img/i4.png';
-import siteProjectIcon5 from '@/assets/blog/surfer/author/img/i5.png';
-import siteProjectIcon6 from '@/assets/blog/surfer/author/img/i6.png';
-import qqImg from '@/assets/blog/surfer/author/img/QQGroup.jpg';
-import weixinImg from '@/assets/blog/surfer/author/img/WeixinGroup.jpg';
-import sponsorImg from '@/assets/blog/surfer/author/img/WeixinSponsor.jpg';
-
-defineOptions({ name: 'SurferAuthorPage' });
-
-type Showcase = { title: string; desc: string; img: string; link: string; type: '站点' | '项目' };
-type ContactType = 'qq' | 'wechat' | 'sponsor';
-
-const themeStore = useThemeStore();
-const pageClass = computed(() => ({ dark: themeStore.darkMode }));
-const modalOpen = ref(false);
-const modalImage = ref('');
-
-const profileTags = ['C#.Net', 'Vue3', 'Full Stack', 'Blog', 'Agent', '骑行', '旅者'];
-const stats = [
-  { label: '主栈', value: 'C# / Vue' },
-  { label: '方向', value: 'B/S 全栈' },
-  { label: '坐标', value: 'Guangzhou' }
-];
-const timelines = [
-  { time: '2026.08', title: 'Mint.Blog 上线', desc: '.Net + Vue3 构建的新版本博客，合并旧版分支并完善后台能力。' },
-  { time: '2023.06', title: '工业自动化软件开发', desc: '参与新能源客户相关业务的软件代码编写与交付。' },
-  { time: '2022.06', title: '系统学习与沉淀', desc: '重新整理知识体系，持续补齐工程化和全栈能力。' },
-];
-const showcases: Showcase[] = [
-  {
-    type: '站点',
-    title: '杨工子',
-    desc: '基于 .Net10 + Vue3 的个人博客。',
-    img: siteProjectIcon1,
-    link: 'https://www.yanggongzi.dev'
-  },
-];
-const skills = ['.Net', 'PostgreSQL', 'Vue3', 'TypeScript', 'Ant Design Vue', 'SCSS', 'Vite', 'RESTful API'];
-const modalImages: Record<ContactType, string> = { qq: qqImg, wechat: weixinImg, sponsor: sponsorImg };
-
-function openContact(type: ContactType) {
-  modalImage.value = modalImages[type];
-  modalOpen.value = true;
-}
-</script>
-
 <template>
   <main class="author-page mx-auto max-w-screen-xl px-4 py-6 pb-12 md:px-6 md:py-8" :class="pageClass">
     <section class="author-hero">
@@ -165,6 +112,59 @@ function openContact(type: ContactType) {
     </AModal>
   </main>
 </template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue';
+import { GithubOutlined, MailOutlined, QqOutlined, WechatOutlined } from '@ant-design/icons-vue';
+import { useThemeStore } from '@/store/system/theme';
+import siteProjectIcon1 from '@/assets/blog/surfer/author/img/i1.png';
+import siteProjectIcon2 from '@/assets/blog/surfer/author/img/i2.png';
+import siteProjectIcon3 from '@/assets/blog/surfer/author/img/i3.png';
+import siteProjectIcon4 from '@/assets/blog/surfer/author/img/i4.png';
+import siteProjectIcon5 from '@/assets/blog/surfer/author/img/i5.png';
+import siteProjectIcon6 from '@/assets/blog/surfer/author/img/i6.png';
+import qqImg from '@/assets/blog/surfer/author/img/QQGroup.jpg';
+import weixinImg from '@/assets/blog/surfer/author/img/WeixinGroup.jpg';
+import sponsorImg from '@/assets/blog/surfer/author/img/WeixinSponsor.jpg';
+
+defineOptions({ name: 'SurferAuthorPage' });
+
+type Showcase = { title: string; desc: string; img: string; link: string; type: '站点' | '项目' };
+type ContactType = 'qq' | 'wechat' | 'sponsor';
+
+const themeStore = useThemeStore();
+const pageClass = computed(() => ({ dark: themeStore.darkMode }));
+const modalOpen = ref(false);
+const modalImage = ref('');
+
+const profileTags = ['C#.Net', 'Vue3', 'Full Stack', 'Blog', 'Agent', '骑行', '旅者'];
+const stats = [
+  { label: '主栈', value: 'C# / Vue' },
+  { label: '方向', value: 'B/S 全栈' },
+  { label: '坐标', value: 'Guangzhou' }
+];
+const timelines = [
+  { time: '2026.08', title: 'Mint.Blog 上线', desc: '.Net + Vue3 构建的新版本博客，合并旧版分支并完善后台能力。' },
+  { time: '2023.06', title: '工业自动化软件开发', desc: '参与新能源客户相关业务的软件代码编写与交付。' },
+  { time: '2022.06', title: '系统学习与沉淀', desc: '重新整理知识体系，持续补齐工程化和全栈能力。' },
+];
+const showcases: Showcase[] = [
+  {
+    type: '站点',
+    title: '杨工子',
+    desc: '基于 .Net10 + Vue3 的个人博客。',
+    img: siteProjectIcon1,
+    link: 'https://www.yanggongzi.dev'
+  },
+];
+const skills = ['.Net', 'PostgreSQL', 'Vue3', 'TypeScript', 'Ant Design Vue', 'SCSS', 'Vite', 'RESTful API'];
+const modalImages: Record<ContactType, string> = { qq: qqImg, wechat: weixinImg, sponsor: sponsorImg };
+
+function openContact(type: ContactType) {
+  modalImage.value = modalImages[type];
+  modalOpen.value = true;
+}
+</script>
 
 <style scoped lang="scss">
 .author-page {

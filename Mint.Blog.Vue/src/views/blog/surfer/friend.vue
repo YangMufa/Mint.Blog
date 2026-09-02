@@ -5,7 +5,7 @@
       :src="friendHeroImageSrc"
       :loading="!friendHeroResolved"
       class="friend-hero"
-      height="340px"
+      height="153px"
       heightMd="400px"
       heightSm="240px"
     >
@@ -17,17 +17,17 @@
         class="friend-hero-inner mx-auto flex h-full max-w-screen-2xl items-center justify-center px-4 text-white md:px-6"
       >
         <div class="friend-hero-content w-full max-w-5xl text-center md:-translate-y-8">
-          <div class="mb-2 flex justify-center">
+          <div class="mb-2 hidden justify-center sm:flex">
             <span
               class="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white/18 text-3xl text-white shadow-2xl backdrop-blur-sm"
             >
               <LinkOutlined />
             </span>
           </div>
-          <h1 class="mb-2 text-3xl font-bold leading-tight text-white sm:mb-2 sm:text-4xl md:text-5xl">
+          <h1 class="mb-2 hidden text-3xl font-bold leading-tight text-white sm:mb-2 sm:block sm:text-4xl md:text-5xl">
             友情链接
           </h1>
-          <p class="mx-auto mb-4 max-w-2xl text-sm leading-7 text-white/86 sm:text-base">
+          <p class="mx-auto mb-4 hidden max-w-2xl text-sm leading-7 text-white/86 sm:block sm:text-base">
             这里收录了一些优秀的技术博客和网站，欢迎互相学习交流。
           </p>
           <div class="flex flex-wrap justify-center gap-3">
@@ -64,7 +64,7 @@
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-0 pb-20">
 
       <!-- 分类标签页 -->
-      <div class="friend-category-bar sticky top-0 z-30 -mx-4 mb-0 px-4 pb-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div class="friend-category-bar sticky top-4 z-30 -mx-4 mb-0 px-4 pb-3 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 lg:top-6">
         <button
           class="friend-category-toggle mb-2 flex w-full cursor-pointer items-center justify-between rounded-lg border border-[#3ecf9a]/14 bg-[#f0faf5]/70 px-3 py-1.5 text-sm font-semibold text-[#15956b] transition-colors hover:bg-[#3ecf9a]/12 dark:border-[#539dfd]/18 dark:bg-[#539dfd]/8 dark:text-[#8cc8ff] dark:hover:bg-[#539dfd]/14"
           @click="isMobileCategoryCollapsed = !isMobileCategoryCollapsed"

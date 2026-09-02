@@ -3,10 +3,16 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Mint.Blog.Infrastructure.DependencyInjection;
 using Mint.Blog.WebApi.Extensions;
 using Scalar.AspNetCore;
+using Serilog;
 
 
 
 var builder = WebApplication.CreateBuilder(args);
+
+// 配置Serilog日志记录
+builder.Host.UseSerilog((context, services, configuration) => configuration
+	.ReadFrom.Configuration(context.Configuration)
+	.ReadFrom.Services(services));
 
 builder.Services.AddWebApi(builder.Configuration);
 builder.Services.AddInfrastructure(builder.Configuration);

@@ -1,3 +1,369 @@
+<template>
+  <div class="image-page flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div class="flex-shrink-0 bg-layout pb-4">
+      <ACard :bordered="false" class="card-wrapper">
+        <AForm layout="inline" class="responsive-search-form">
+          <AFormItem label="桶名称">
+            <ASelect
+              v-model:value="query.bucketName"
+              allow-clear
+              show-search
+              placeholder="请选择桶"
+              class="w-full sm:w-[180px]"
+              :get-popup-container="getSelectPopupContainer"
+              @change="handleBucketChange"
+            >
+              <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
+                {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
+              </ASelectOption>
+            </ASelect>
+          </AFormItem>
+          <AFormItem label="图片名称">
+            <AInput
+              v-model:value="query.fileName"
+              allow-clear
+              placeholder="请输入图片名称"
+              class="w-full sm:w-[220px]"
+              @update:value="handleImageNameInput"
+              @press-enter="handleSearch"
+            />
+          </AFormItem>
+          <AFormItem label="使用状态">
+            <ASelect
+              v-model:value="query.used"
+              allow-clear
+              placeholder="全部"
+              class="w-full sm:w-[180px]"
+              popup-class-name="image-page-select-dropdown"
+              :get-popup-container="getSelectPopupContainer"
+              @change="handleSearch"
+            >
+              <ASelectOption value="true">
+                <span class="select-option-text">已使用</span>
+              </ASelectOption>
+              <ASelectOption value="false">
+                <span class="select-option-text">未使用</span>
+              </ASelectOption>
+            </ASelect>
+          </AFormItem>
+          <AFormItem>
+            <ASpace wrap>
+              <AButton @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </AButton>
+              <AButton @click="openCreateBucketModal">创建桶</AButton>
+              <AButton :disabled="!query.bucketName" @click="openUploadModal">上传图片</AButton>
+              <ASwitch
+                v-if="currentBucket"
+                :checked="currentBucket.isPublic"
+                checked-children="公开"
+                un-checked-children="私有"
+                @change="toggleCurrentBucketPublic"
+              />
+              <APopconfirm title="确定删除当前桶吗？桶必须为空，默认桶不能删除。" @confirm="confirmDeleteCurrentBucket">
+                <AButton danger :disabled="!query.bucketName">删除桶</AButton>
+              </APopconfirm>
+              <AButton :disabled="!selectedCount" @click="openBatchMoveModal">
+                批量移动{{ selectedCount ? `（${selectedCount}）` : '' }}
+              </AButton>
+              <APopconfirm
+                title="确定批量删除选中的图片吗？正在被文章引用的图片会自动跳过。"
+                :overlay-style="{ minWidth: '260px' }"
+                @confirm="confirmBatchDelete"
+              >
+                <AButton danger :disabled="!selectedCount">
+                  批量删除{{ selectedCount ? `（${selectedCount}）` : '' }}
+                </AButton>
+              </APopconfirm>
+            </ASpace>
+          </AFormItem>
+        </AForm>
+      </ACard>
+    </div>
+
+    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
+      <div
+        v-if="bucketLoadFailed"
+        class="bucket-error-state flex flex-1 items-center justify-center px-6 py-10 text-center"
+      >
+        <div v-if="permissionDenied">
+          <div class="mb-2 text-base font-semibold text-orange-500">权限不足</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400">
+            您当前没有权限访问图片管理功能，请确认账号已登录或联系管理员分配访问权限。
+          </div>
+          <AButton class="mt-4" @click="onRetryLoadBuckets">重新加载</AButton>
+        </div>
+        <div v-else>
+          <div class="mb-2 text-base font-semibold text-red-500">图片存储服务暂时不可用</div>
+          <div class="text-sm text-gray-500 dark:text-gray-400">
+            请检查 RustFS 是否正常启动、桶权限和后端配置是否正确。页面已停止加载图片列表，避免显示旧数据。
+          </div>
+          <AButton class="mt-4" type="primary" @click="onRetryLoadBuckets">重新加载</AButton>
+        </div>
+      </div>
+      <ATable
+        v-else
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="record => `${record.bucketName}/${record.objectName}`"
+        :row-selection="{
+          selectedRowKeys,
+          preserveSelectedRowKeys: true,
+          onChange: handleSelectionChange
+        }"
+        :scroll="{ x: tableScrollX, y: tableScrollY }"
+        bordered
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+          <template v-else-if="column.key === 'image'">
+            <AImage :width="88" :height="64" :src="record.url" class="image-preview" />
+          </template>
+          <template v-else-if="column.key === 'url'">
+            <div class="url-cell">
+              <ATooltip :title="record.url" placement="topLeft">
+                <ATypographyLink class="url-text" @click="openImageUrl(record.url)">
+                  {{ record.url }}
+                </ATypographyLink>
+              </ATooltip>
+              <AButton size="small" type="link" class="url-copy-button" @click="copyUrl(record.url)">
+                <template #icon><LinkOutlined /></template>
+                复制
+              </AButton>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'referencedArticles'">
+            <div class="reference-cell">
+              <ASpace v-if="record.referencedArticles.length" wrap :size="4">
+                <ATag
+                  v-for="article in record.referencedArticles"
+                  :key="article.articleId"
+                  color="processing"
+                  class="reference-tag"
+                >
+                  <span class="reference-tag-text" :title="article.articleTitle">{{ article.articleTitle }}</span>
+                </ATag>
+              </ASpace>
+              <ATag v-else color="default">未使用</ATag>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'articleLinks'">
+            <div class="article-link-cell">
+              <ASpace v-if="record.referencedArticles.length" direction="vertical" :size="2" class="w-full">
+                <span v-for="article in record.referencedArticles" :key="article.articleId" class="article-link-item">
+                  <APopconfirm
+                    title="请选择文章链接操作"
+                    ok-text="跳转预览"
+                    cancel-text="复制链接"
+                    @confirm="openArticleLink(article.articleUrl)"
+                    @cancel="copyArticleLink(article.articleUrl)"
+                  >
+                    <AButton type="link" size="small" class="article-link-button">
+                      <span :title="article.articleTitle">{{ article.articleTitle }}</span>
+                    </AButton>
+                  </APopconfirm>
+                </span>
+              </ASpace>
+              <span v-else class="text-gray-400">-</span>
+            </div>
+          </template>
+          <template v-else-if="column.key === 'size'">{{ formatSize(record.size) }}</template>
+          <template v-else-if="column.key === 'lastModified'">{{ formatDateTime(record.lastModified) }}</template>
+          <template v-else-if="column.key === 'action'">
+            <ASpace>
+              <ATooltip title="改名">
+                <AButton size="small" shape="circle" @click="openRenameModal(record as ManagedImageListItem)">
+                  <template #icon><EditOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="移动到其他桶">
+                <AButton size="small" @click="openMoveModal(record as ManagedImageListItem)">移动</AButton>
+              </ATooltip>
+              <APopconfirm
+                title="确定删除这张图片吗？如果文章仍在引用，图片会无法显示。"
+                overlay-class-name="image-delete-popconfirm"
+                @confirm="confirmDelete(record as ManagedImageListItem)"
+              >
+                <ATooltip title="删除">
+                  <AButton danger size="small" shape="circle">
+                    <template #icon><DeleteOutlined /></template>
+                  </AButton>
+                </ATooltip>
+              </APopconfirm>
+            </ASpace>
+          </template>
+        </template>
+      </ATable>
+    </ACard>
+
+    <AModal
+      v-model:open="bucketModalVisible"
+      title="创建 RustFS 桶"
+      :width="bucketModalWidth"
+      :confirm-loading="bucketLoading"
+      @ok="confirmCreateBucket"
+    >
+      <AForm layout="vertical">
+        <AFormItem label="桶名称">
+          <AInput v-model:value="bucketForm.bucketName" allow-clear placeholder="例如 blog、article-images" />
+        </AFormItem>
+        <AFormItem label="访问权限">
+          <ASwitch v-model:checked="bucketForm.isPublic" checked-children="公开读取" un-checked-children="私有" />
+        </AFormItem>
+      </AForm>
+    </AModal>
+
+    <AModal
+      v-model:open="uploadModalVisible"
+      title="上传图片到当前桶"
+      :width="uploadModalWidth"
+      :confirm-loading="uploadLoading"
+      :footer="null"
+      @cancel="handleUploadCancel"
+    >
+      <div class="upload-modal-body">
+        <AForm layout="vertical" class="upload-modal-form">
+          <AFormItem label="目标桶">
+            <AInput :value="query.bucketName" disabled />
+          </AFormItem>
+          <AFormItem label="图片文件">
+            <input
+              ref="uploadInputRef"
+              type="file"
+              accept="image/*"
+              multiple
+              class="hidden"
+              @change="handleManualUploadFileChange"
+            />
+            <ASpace wrap>
+              <AButton @click="openUploadFilePicker">选择图片</AButton>
+              <span class="text-sm text-base-text/70">
+                {{ uploadFiles.length ? `已选择 ${uploadFiles.length} 张图片` : '未选择图片' }}
+              </span>
+            </ASpace>
+            <div v-if="uploadFiles.length" class="upload-file-list mt-3 space-y-2">
+              <div
+                v-for="(file, index) in uploadFiles"
+                :key="`${file.name}-${file.size}-${index}`"
+                class="flex items-center justify-between rounded-lg border border-border-color px-3 py-2"
+              >
+                <div class="min-w-0 flex-1 pr-3">
+                  <div class="truncate text-sm font-medium">{{ file.name }}</div>
+                  <div class="text-xs text-base-text/60">{{ formatSize(file.size) }}</div>
+                </div>
+                <AButton size="small" danger type="text" @click="removeUploadFile(index)">移除</AButton>
+              </div>
+            </div>
+          </AFormItem>
+        </AForm>
+        <div class="upload-modal-actions">
+          <AButton class="min-w-[96px]" @click="handleUploadCancel">取消</AButton>
+          <AButton class="min-w-[96px]" type="primary" :loading="uploadLoading" @click="confirmUploadToBucket">
+            确定
+          </AButton>
+        </div>
+      </div>
+    </AModal>
+
+    <AModal
+      v-model:open="moveModalVisible"
+      :title="isBatchMove ? '批量移动图片到其他桶' : '移动图片到其他桶'"
+      :width="moveModalWidth"
+      :confirm-loading="moveLoading"
+      :footer="null"
+      @cancel="handleMoveCancel"
+    >
+      <div class="upload-modal-body">
+        <AForm layout="vertical" class="upload-modal-form">
+          <AFormItem v-if="!isBatchMove" label="当前图片">
+            <AInput :value="currentImage?.objectName" disabled />
+          </AFormItem>
+          <AFormItem v-if="!isBatchMove" label="当前桶">
+            <AInput :value="currentImage?.bucketName" disabled />
+          </AFormItem>
+          <AFormItem v-else label="已选图片数量">
+            <AInput :value="`${selectedCount} 张`" disabled />
+          </AFormItem>
+          <AFormItem label="目标桶">
+            <ASelect v-model:value="moveTargetBucketName" placeholder="请选择目标桶">
+              <ASelectOption v-for="item in movableBucketOptions" :key="item.name" :value="item.name">
+                {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
+              </ASelectOption>
+            </ASelect>
+          </AFormItem>
+        </AForm>
+        <div class="upload-modal-actions">
+          <AButton class="min-w-[96px]" @click="handleMoveCancel">取消</AButton>
+          <AButton class="min-w-[96px]" type="primary" :loading="moveLoading" @click="confirmMove">确定</AButton>
+        </div>
+      </div>
+    </AModal>
+
+    <AModal
+      v-model:open="moveConflictsModalVisible"
+      title="发现同名文件"
+      :width="moveModalWidth"
+      :footer="null"
+      @cancel="moveConflictsModalVisible = false"
+    >
+      <div class="upload-modal-body">
+        <AAlert
+          type="warning"
+          show-icon
+          :message="`目标桶中有 ${moveConflicts.length} 个同名文件，请选择处理方式`"
+          class="mb-4"
+        />
+        <div class="upload-file-list space-y-2">
+          <div
+            v-for="item in moveConflicts"
+            :key="`${item.sourceUrl}-${item.targetUrl}`"
+            class="rounded-lg border border-border-color px-3 py-2"
+          >
+            <div class="truncate text-sm font-medium">{{ item.targetObjectName }}</div>
+            <div class="mt-1 text-xs text-base-text/60">源桶：{{ item.sourceBucketName }}</div>
+            <div class="truncate text-xs text-base-text/60">{{ item.targetUrl }}</div>
+          </div>
+        </div>
+        <div class="upload-modal-actions">
+          <AButton class="min-w-[96px]" @click="moveConflictsModalVisible = false">取消</AButton>
+          <AButton class="min-w-[96px]" @click="handleMoveConflictSkip">跳过同名继续</AButton>
+          <AButton
+            class="min-w-[96px]"
+            type="primary"
+            :loading="movePrecheckLoading"
+            @click="handleMoveConflictOverwrite"
+          >
+            替换同名继续
+          </AButton>
+        </div>
+      </div>
+    </AModal>
+
+    <AModal
+      v-model:open="renameModalVisible"
+      title="图片改名"
+      :width="renameModalWidth"
+      :confirm-loading="renameLoading"
+      @ok="confirmRename"
+      @cancel="handleRenameCancel"
+    >
+      <AForm layout="vertical">
+        <AFormItem label="原图片名称">
+          <AInput :value="currentImage?.objectName" disabled />
+        </AFormItem>
+        <AFormItem label="新图片名称">
+          <AInput v-model:value="newImageName" allow-clear placeholder="请输入新图片名称，未填扩展名时会沿用原扩展名" />
+        </AFormItem>
+      </AForm>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
@@ -723,372 +1089,6 @@ onBeforeUnmount(() => {
   clearSearchDebounce();
 });
 </script>
-
-<template>
-  <div class="image-page flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <div class="flex-shrink-0 bg-layout pb-4">
-      <ACard :bordered="false" class="card-wrapper">
-        <AForm layout="inline" class="responsive-search-form">
-          <AFormItem label="桶名称">
-            <ASelect
-              v-model:value="query.bucketName"
-              allow-clear
-              show-search
-              placeholder="请选择桶"
-              class="w-full sm:w-[180px]"
-              :get-popup-container="getSelectPopupContainer"
-              @change="handleBucketChange"
-            >
-              <ASelectOption v-for="item in bucketOptions" :key="item.name" :value="item.name">
-                {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
-              </ASelectOption>
-            </ASelect>
-          </AFormItem>
-          <AFormItem label="图片名称">
-            <AInput
-              v-model:value="query.fileName"
-              allow-clear
-              placeholder="请输入图片名称"
-              class="w-full sm:w-[220px]"
-              @update:value="handleImageNameInput"
-              @press-enter="handleSearch"
-            />
-          </AFormItem>
-          <AFormItem label="使用状态">
-            <ASelect
-              v-model:value="query.used"
-              allow-clear
-              placeholder="全部"
-              class="w-full sm:w-[180px]"
-              popup-class-name="image-page-select-dropdown"
-              :get-popup-container="getSelectPopupContainer"
-              @change="handleSearch"
-            >
-              <ASelectOption value="true">
-                <span class="select-option-text">已使用</span>
-              </ASelectOption>
-              <ASelectOption value="false">
-                <span class="select-option-text">未使用</span>
-              </ASelectOption>
-            </ASelect>
-          </AFormItem>
-          <AFormItem>
-            <ASpace wrap>
-              <AButton @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </AButton>
-              <AButton @click="openCreateBucketModal">创建桶</AButton>
-              <AButton :disabled="!query.bucketName" @click="openUploadModal">上传图片</AButton>
-              <ASwitch
-                v-if="currentBucket"
-                :checked="currentBucket.isPublic"
-                checked-children="公开"
-                un-checked-children="私有"
-                @change="toggleCurrentBucketPublic"
-              />
-              <APopconfirm title="确定删除当前桶吗？桶必须为空，默认桶不能删除。" @confirm="confirmDeleteCurrentBucket">
-                <AButton danger :disabled="!query.bucketName">删除桶</AButton>
-              </APopconfirm>
-              <AButton :disabled="!selectedCount" @click="openBatchMoveModal">
-                批量移动{{ selectedCount ? `（${selectedCount}）` : '' }}
-              </AButton>
-              <APopconfirm
-                title="确定批量删除选中的图片吗？正在被文章引用的图片会自动跳过。"
-                :overlay-style="{ minWidth: '260px' }"
-                @confirm="confirmBatchDelete"
-              >
-                <AButton danger :disabled="!selectedCount">
-                  批量删除{{ selectedCount ? `（${selectedCount}）` : '' }}
-                </AButton>
-              </APopconfirm>
-            </ASpace>
-          </AFormItem>
-        </AForm>
-      </ACard>
-    </div>
-
-    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
-      <div
-        v-if="bucketLoadFailed"
-        class="bucket-error-state flex flex-1 items-center justify-center px-6 py-10 text-center"
-      >
-        <div v-if="permissionDenied">
-          <div class="mb-2 text-base font-semibold text-orange-500">权限不足</div>
-          <div class="text-sm text-gray-500 dark:text-gray-400">
-            您当前没有权限访问图片管理功能，请确认账号已登录或联系管理员分配访问权限。
-          </div>
-          <AButton class="mt-4" @click="onRetryLoadBuckets">重新加载</AButton>
-        </div>
-        <div v-else>
-          <div class="mb-2 text-base font-semibold text-red-500">图片存储服务暂时不可用</div>
-          <div class="text-sm text-gray-500 dark:text-gray-400">
-            请检查 RustFS 是否正常启动、桶权限和后端配置是否正确。页面已停止加载图片列表，避免显示旧数据。
-          </div>
-          <AButton class="mt-4" type="primary" @click="onRetryLoadBuckets">重新加载</AButton>
-        </div>
-      </div>
-      <ATable
-        v-else
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="record => `${record.bucketName}/${record.objectName}`"
-        :row-selection="{
-          selectedRowKeys,
-          preserveSelectedRowKeys: true,
-          onChange: handleSelectionChange
-        }"
-        :scroll="{ x: tableScrollX, y: tableScrollY }"
-        bordered
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-          <template v-else-if="column.key === 'image'">
-            <AImage :width="88" :height="64" :src="record.url" class="image-preview" />
-          </template>
-          <template v-else-if="column.key === 'url'">
-            <div class="url-cell">
-              <ATooltip :title="record.url" placement="topLeft">
-                <ATypographyLink class="url-text" @click="openImageUrl(record.url)">
-                  {{ record.url }}
-                </ATypographyLink>
-              </ATooltip>
-              <AButton size="small" type="link" class="url-copy-button" @click="copyUrl(record.url)">
-                <template #icon><LinkOutlined /></template>
-                复制
-              </AButton>
-            </div>
-          </template>
-          <template v-else-if="column.key === 'referencedArticles'">
-            <div class="reference-cell">
-              <ASpace v-if="record.referencedArticles.length" wrap :size="4">
-                <ATag
-                  v-for="article in record.referencedArticles"
-                  :key="article.articleId"
-                  color="processing"
-                  class="reference-tag"
-                >
-                  <span class="reference-tag-text" :title="article.articleTitle">{{ article.articleTitle }}</span>
-                </ATag>
-              </ASpace>
-              <ATag v-else color="default">未使用</ATag>
-            </div>
-          </template>
-          <template v-else-if="column.key === 'articleLinks'">
-            <div class="article-link-cell">
-              <ASpace v-if="record.referencedArticles.length" direction="vertical" :size="2" class="w-full">
-                <span v-for="article in record.referencedArticles" :key="article.articleId" class="article-link-item">
-                  <APopconfirm
-                    title="请选择文章链接操作"
-                    ok-text="跳转预览"
-                    cancel-text="复制链接"
-                    @confirm="openArticleLink(article.articleUrl)"
-                    @cancel="copyArticleLink(article.articleUrl)"
-                  >
-                    <AButton type="link" size="small" class="article-link-button">
-                      <span :title="article.articleTitle">{{ article.articleTitle }}</span>
-                    </AButton>
-                  </APopconfirm>
-                </span>
-              </ASpace>
-              <span v-else class="text-gray-400">-</span>
-            </div>
-          </template>
-          <template v-else-if="column.key === 'size'">{{ formatSize(record.size) }}</template>
-          <template v-else-if="column.key === 'lastModified'">{{ formatDateTime(record.lastModified) }}</template>
-          <template v-else-if="column.key === 'action'">
-            <ASpace>
-              <ATooltip title="改名">
-                <AButton size="small" shape="circle" @click="openRenameModal(record as ManagedImageListItem)">
-                  <template #icon><EditOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="移动到其他桶">
-                <AButton size="small" @click="openMoveModal(record as ManagedImageListItem)">移动</AButton>
-              </ATooltip>
-              <APopconfirm
-                title="确定删除这张图片吗？如果文章仍在引用，图片会无法显示。"
-                overlay-class-name="image-delete-popconfirm"
-                @confirm="confirmDelete(record as ManagedImageListItem)"
-              >
-                <ATooltip title="删除">
-                  <AButton danger size="small" shape="circle">
-                    <template #icon><DeleteOutlined /></template>
-                  </AButton>
-                </ATooltip>
-              </APopconfirm>
-            </ASpace>
-          </template>
-        </template>
-      </ATable>
-    </ACard>
-
-    <AModal
-      v-model:open="bucketModalVisible"
-      title="创建 RustFS 桶"
-      :width="bucketModalWidth"
-      :confirm-loading="bucketLoading"
-      @ok="confirmCreateBucket"
-    >
-      <AForm layout="vertical">
-        <AFormItem label="桶名称">
-          <AInput v-model:value="bucketForm.bucketName" allow-clear placeholder="例如 blog、article-images" />
-        </AFormItem>
-        <AFormItem label="访问权限">
-          <ASwitch v-model:checked="bucketForm.isPublic" checked-children="公开读取" un-checked-children="私有" />
-        </AFormItem>
-      </AForm>
-    </AModal>
-
-    <AModal
-      v-model:open="uploadModalVisible"
-      title="上传图片到当前桶"
-      :width="uploadModalWidth"
-      :confirm-loading="uploadLoading"
-      :footer="null"
-      @cancel="handleUploadCancel"
-    >
-      <div class="upload-modal-body">
-        <AForm layout="vertical" class="upload-modal-form">
-          <AFormItem label="目标桶">
-            <AInput :value="query.bucketName" disabled />
-          </AFormItem>
-          <AFormItem label="图片文件">
-            <input
-              ref="uploadInputRef"
-              type="file"
-              accept="image/*"
-              multiple
-              class="hidden"
-              @change="handleManualUploadFileChange"
-            />
-            <ASpace wrap>
-              <AButton @click="openUploadFilePicker">选择图片</AButton>
-              <span class="text-sm text-base-text/70">
-                {{ uploadFiles.length ? `已选择 ${uploadFiles.length} 张图片` : '未选择图片' }}
-              </span>
-            </ASpace>
-            <div v-if="uploadFiles.length" class="upload-file-list mt-3 space-y-2">
-              <div
-                v-for="(file, index) in uploadFiles"
-                :key="`${file.name}-${file.size}-${index}`"
-                class="flex items-center justify-between rounded-lg border border-border-color px-3 py-2"
-              >
-                <div class="min-w-0 flex-1 pr-3">
-                  <div class="truncate text-sm font-medium">{{ file.name }}</div>
-                  <div class="text-xs text-base-text/60">{{ formatSize(file.size) }}</div>
-                </div>
-                <AButton size="small" danger type="text" @click="removeUploadFile(index)">移除</AButton>
-              </div>
-            </div>
-          </AFormItem>
-        </AForm>
-        <div class="upload-modal-actions">
-          <AButton class="min-w-[96px]" @click="handleUploadCancel">取消</AButton>
-          <AButton class="min-w-[96px]" type="primary" :loading="uploadLoading" @click="confirmUploadToBucket">
-            确定
-          </AButton>
-        </div>
-      </div>
-    </AModal>
-
-    <AModal
-      v-model:open="moveModalVisible"
-      :title="isBatchMove ? '批量移动图片到其他桶' : '移动图片到其他桶'"
-      :width="moveModalWidth"
-      :confirm-loading="moveLoading"
-      :footer="null"
-      @cancel="handleMoveCancel"
-    >
-      <div class="upload-modal-body">
-        <AForm layout="vertical" class="upload-modal-form">
-          <AFormItem v-if="!isBatchMove" label="当前图片">
-            <AInput :value="currentImage?.objectName" disabled />
-          </AFormItem>
-          <AFormItem v-if="!isBatchMove" label="当前桶">
-            <AInput :value="currentImage?.bucketName" disabled />
-          </AFormItem>
-          <AFormItem v-else label="已选图片数量">
-            <AInput :value="`${selectedCount} 张`" disabled />
-          </AFormItem>
-          <AFormItem label="目标桶">
-            <ASelect v-model:value="moveTargetBucketName" placeholder="请选择目标桶">
-              <ASelectOption v-for="item in movableBucketOptions" :key="item.name" :value="item.name">
-                {{ item.name }}{{ item.isPublic ? '（公开）' : '（私有）' }}
-              </ASelectOption>
-            </ASelect>
-          </AFormItem>
-        </AForm>
-        <div class="upload-modal-actions">
-          <AButton class="min-w-[96px]" @click="handleMoveCancel">取消</AButton>
-          <AButton class="min-w-[96px]" type="primary" :loading="moveLoading" @click="confirmMove">确定</AButton>
-        </div>
-      </div>
-    </AModal>
-
-    <AModal
-      v-model:open="moveConflictsModalVisible"
-      title="发现同名文件"
-      :width="moveModalWidth"
-      :footer="null"
-      @cancel="moveConflictsModalVisible = false"
-    >
-      <div class="upload-modal-body">
-        <AAlert
-          type="warning"
-          show-icon
-          :message="`目标桶中有 ${moveConflicts.length} 个同名文件，请选择处理方式`"
-          class="mb-4"
-        />
-        <div class="upload-file-list space-y-2">
-          <div
-            v-for="item in moveConflicts"
-            :key="`${item.sourceUrl}-${item.targetUrl}`"
-            class="rounded-lg border border-border-color px-3 py-2"
-          >
-            <div class="truncate text-sm font-medium">{{ item.targetObjectName }}</div>
-            <div class="mt-1 text-xs text-base-text/60">源桶：{{ item.sourceBucketName }}</div>
-            <div class="truncate text-xs text-base-text/60">{{ item.targetUrl }}</div>
-          </div>
-        </div>
-        <div class="upload-modal-actions">
-          <AButton class="min-w-[96px]" @click="moveConflictsModalVisible = false">取消</AButton>
-          <AButton class="min-w-[96px]" @click="handleMoveConflictSkip">跳过同名继续</AButton>
-          <AButton
-            class="min-w-[96px]"
-            type="primary"
-            :loading="movePrecheckLoading"
-            @click="handleMoveConflictOverwrite"
-          >
-            替换同名继续
-          </AButton>
-        </div>
-      </div>
-    </AModal>
-
-    <AModal
-      v-model:open="renameModalVisible"
-      title="图片改名"
-      :width="renameModalWidth"
-      :confirm-loading="renameLoading"
-      @ok="confirmRename"
-      @cancel="handleRenameCancel"
-    >
-      <AForm layout="vertical">
-        <AFormItem label="原图片名称">
-          <AInput :value="currentImage?.objectName" disabled />
-        </AFormItem>
-        <AFormItem label="新图片名称">
-          <AInput v-model:value="newImageName" allow-clear placeholder="请输入新图片名称，未填扩展名时会沿用原扩展名" />
-        </AFormItem>
-      </AForm>
-    </AModal>
-  </div>
-</template>
 
 <style scoped lang="scss">
 .image-page {

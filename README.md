@@ -150,7 +150,8 @@ pnpm run build
 
 ## 周边生态
 
-- [Mint.Admin](https://github.com/YangGongziDev/Mint.Admin)：基于Mint.Blog 重新构建的.Net DDD 中后台快速开发框架。
+- [Mint.Admin.DDD](https://github.com/YangGongziDev/Mint.Admin.DDD)：基于`Mint.Blog`重新构建的`.Net DDD`中后台快速开发框架。
+- [Mint.Admin.Vue](https://github.com/YangGongziDev/Mint.Admin.Vue)：基于`Mint.Blog.Vue`重新构建的`TypeScript Vue`中后台快速开发项目，用于配套`Mint.Admin.DDD`后端。
 
 
 ## 如何贡献

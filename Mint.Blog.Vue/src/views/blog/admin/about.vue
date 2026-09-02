@@ -1,67 +1,3 @@
-<script setup lang="ts">
-defineOptions({
-  name: 'AboutPage'
-});
-
-const highlights = ['前后端分离', '博客后台管理', '文章与评论', '专栏', '统计分析'];
-
-const stats = [
-  { label: '项目版本', value: 'v2.0.0' },
-  { label: '后端框架', value: '.NET 10' },
-  { label: '数据库', value: 'PostgreSQL 18' },
-  { label: '前端框架', value: 'Vue 3.5' }
-];
-
-const projectInfo = [
-  { label: '项目名称', value: 'Mint.Blog' },
-  { label: '作者', value: '杨工子' },
-  { label: '开源协议', value: 'GPL-3.0 license' },
-  { label: '项目定位', value: '个人博客 / 内容管理 / 知识整理' },
-  { label: '项目仓库', value: 'https://github.com/YangGongziDev/Mint.Blog', link: 'https://github.com/YangGongziDev/Mint.Blog' },
-  { label: '站点首页', value: 'https://www.yanggongzi.dev', link: 'https://www.yanggongzi.dev' },
-  { label: '接口地址', value: 'https://www.yanggongzi.dev/api/blog', link: 'https://www.yanggongzi.dev/api/blog' },
-  { label: '后台环境', value: '.NET 10 / SqlSugar / PostgreSQL / RustFS / JWT' },
-  { label: '前端环境', value: 'Node.js 24+ / PNPM 10+ / Vite 8' }
-];
-
-const features = [
-  {
-    title: '文章管理',
-    desc: '支持文章创建、编辑、删除、置顶、归档与搜索等常见博客能力。'
-  },
-  {
-    title: '内容生态',
-    desc: '包含分类、标签、评论、友链、博客设置等完整内容管理模块。'
-  },
-  {
-    title: '专栏 模块',
-    desc: '支持专栏组织与文章关联，适合沉淀专题化内容。'
-  },
-  {
-    title: '统计分析',
-    desc: '内置访问量与后台面板统计能力，便于观察站点运营情况。'
-  }
-];
-
-const backendStack = [
-  { name: '.NET', desc: '作为 Web API 主运行时，承担接口服务与业务处理。' },
-  { name: 'DDD 分层', desc: '划分 Domain、Application、Infrastructure、WebApi，职责更清晰。' },
-  { name: 'SqlSugar', desc: '负责数据库访问与数据模型映射。' },
-  { name: 'PostgreSQL', desc: '作为核心业务数据存储，承载博客内容与统计数据。' },
-  { name: 'JWT', desc: '提供后台登录鉴权与接口访问授权能力。' },
-  { name: 'RustFS', desc: '用于图片与文件对象存储。' }
-];
-
-const frontendStack = [
-  { name: 'Vue', desc: '负责页面渲染与组件化开发。' },
-  { name: 'TypeScript', desc: '提升代码可维护性与类型安全。' },
-  { name: 'Vite', desc: '提供快速开发体验与高效构建能力。' },
-  { name: 'Ant Design Vue', desc: '承担后台界面组件与交互基础。' },
-  { name: 'Tailwind CSS', desc: '辅助页面快速布局与视觉细节调整。' },
-  { name: 'Pinia + Vue Router', desc: '用于状态管理、路由守卫与后台导航体系。' }
-];
-</script>
-
 <template>
   <div class="about-page">
     <ACard :bordered="false" class="hero-card card-wrapper">
@@ -147,6 +83,70 @@ const frontendStack = [
     </ARow>
   </div>
 </template>
+
+<script setup lang="ts">
+defineOptions({
+  name: 'AboutPage'
+});
+
+const highlights = ['前后端分离', '博客后台管理', '文章与评论', '专栏', '统计分析'];
+
+const stats = [
+  { label: '项目版本', value: 'v2.0.0' },
+  { label: '后端框架', value: '.NET 10' },
+  { label: '数据库', value: 'PostgreSQL 18' },
+  { label: '前端框架', value: 'Vue 3.5' }
+];
+
+const projectInfo = [
+  { label: '项目名称', value: 'Mint.Blog' },
+  { label: '作者', value: '杨工子' },
+  { label: '开源协议', value: 'GPL-3.0 license' },
+  { label: '项目定位', value: '个人博客 / 内容管理 / 知识整理' },
+  { label: '项目仓库', value: 'https://github.com/YangGongziDev/Mint.Blog', link: 'https://github.com/YangGongziDev/Mint.Blog' },
+  { label: '站点首页', value: 'https://www.yanggongzi.dev', link: 'https://www.yanggongzi.dev' },
+  { label: '接口地址', value: 'https://www.yanggongzi.dev/api/blog', link: 'https://www.yanggongzi.dev/api/blog' },
+  { label: '后台环境', value: '.NET 10 / SqlSugar / PostgreSQL / RustFS / JWT' },
+  { label: '前端环境', value: 'Node.js 24+ / PNPM 10+ / Vite 8' }
+];
+
+const features = [
+  {
+    title: '文章管理',
+    desc: '支持文章创建、编辑、删除、置顶、归档与搜索等常见博客能力。'
+  },
+  {
+    title: '内容生态',
+    desc: '包含分类、标签、评论、友链、博客设置等完整内容管理模块。'
+  },
+  {
+    title: '专栏 模块',
+    desc: '支持专栏组织与文章关联，适合沉淀专题化内容。'
+  },
+  {
+    title: '统计分析',
+    desc: '内置访问量与后台面板统计能力，便于观察站点运营情况。'
+  }
+];
+
+const backendStack = [
+  { name: '.NET', desc: '作为 Web API 主运行时，承担接口服务与业务处理。' },
+  { name: 'DDD 分层', desc: '划分 Domain、Application、Infrastructure、WebApi，职责更清晰。' },
+  { name: 'SqlSugar', desc: '负责数据库访问与数据模型映射。' },
+  { name: 'PostgreSQL', desc: '作为核心业务数据存储，承载博客内容与统计数据。' },
+  { name: 'JWT', desc: '提供后台登录鉴权与接口访问授权能力。' },
+  { name: 'RustFS', desc: '用于图片与文件对象存储。' }
+];
+
+const frontendStack = [
+  { name: 'Vue', desc: '负责页面渲染与组件化开发。' },
+  { name: 'TypeScript', desc: '提升代码可维护性与类型安全。' },
+  { name: 'Vite', desc: '提供快速开发体验与高效构建能力。' },
+  { name: 'Ant Design Vue', desc: '承担后台界面组件与交互基础。' },
+  { name: 'Tailwind CSS', desc: '辅助页面快速布局与视觉细节调整。' },
+  { name: 'Pinia + Vue Router', desc: '用于状态管理、路由守卫与后台导航体系。' }
+];
+</script>
 
 <style scoped lang="scss">
 .about-page {

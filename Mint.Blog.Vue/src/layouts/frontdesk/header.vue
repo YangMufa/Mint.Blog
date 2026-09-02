@@ -7,7 +7,7 @@
     >
       <SystemLogo
         :src="authorAvatar"
-        class="header-blog-logo h-[34px] w-[34px] sm:h-[38px] sm:w-[38px] shrink-0 ml-[0px]"
+        class="header-blog-logo shrink-0 ml-[0px]" :style="{ '--lw': '35px', '--lh': '35px' }"
       />
       <h2 class="pl-[6px] sm:pl-[8px] text-[18px] sm:text-[21px] text-primary font-bold transition duration-300 ease-in-out truncate">
         {{ $t('system.title') }}

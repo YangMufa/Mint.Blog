@@ -1,3 +1,113 @@
+<template>
+  <ASpace direction="vertical" :size="16" class="w-full">
+
+    <ACard :bordered="false" class="card-wrapper">
+      <AForm
+        ref="formRef"
+        :model="formModel"
+        :rules="rules"
+        :label-col="formLabelCol"
+        :wrapper-col="formWrapperCol"
+        :layout="appStore.isMobile ? 'vertical' : 'horizontal'"
+        class="mx-auto max-w-[960px]"
+      >
+
+        <AFormItem label="博客名称" name="name">
+          <AInput v-model:value="formModel.name" allow-clear placeholder="请输入博客名称" />
+        </AFormItem>
+        <AFormItem label="作者名" name="author">
+          <AInput v-model:value="formModel.author" allow-clear placeholder="请输入作者名" />
+        </AFormItem>
+        <AFormItem label="博客 LOGO" name="logo">
+          <UploadPreview
+            title="上传 LOGO"
+            hint="建议尺寸 200x200px"
+            :src="formModel.logo"
+            shape="square"
+            @select="handleLogoChange"
+          />
+        </AFormItem>
+        <AFormItem label="作者头像" name="avatar">
+          <UploadPreview
+            title="上传头像"
+            hint="建议尺寸 200x200px"
+            :src="formModel.avatar"
+            shape="circle"
+            @select="handleAvatarChange"
+          />
+        </AFormItem>
+        <AFormItem label="介绍语" name="introduction">
+          <ATextarea v-model:value="formModel.introduction" :rows="3" allow-clear placeholder="请输入博客介绍语" />
+        </AFormItem>
+        <AFormItem label="版权声明" name="copyrightDeclaration">
+          <div class="no-scrollbar-textarea">
+            <ATextarea
+              v-model:value="formModel.copyrightDeclaration"
+              :auto-size="{ minRows: 3 }"
+              :maxlength="300"
+              show-count
+              allow-clear
+              placeholder="请输入版权声明内容"
+            />
+          </div>
+        </AFormItem>
+        <AFormItem label="自动切换主题" name="isAutoTheme">
+          <ASpace direction="vertical" :size="4">
+            <ASwitch v-model:checked="formModel.isAutoTheme" checked-children="开启" un-checked-children="关闭" />
+            <ATypographyText type="secondary">开启后将根据系统时间自动切换白天/黑夜主题。</ATypographyText>
+          </ASpace>
+        </AFormItem>
+
+        <AFormItem label="GitHub 主页">
+          <AInput v-model:value="formModel.githubHomepage" allow-clear placeholder="请输入 GitHub 主页 URL" />
+        </AFormItem>
+        <AFormItem label="Gitee 主页">
+          <AInput v-model:value="formModel.giteeHomepage" allow-clear placeholder="请输入 Gitee 主页 URL" />
+        </AFormItem>
+        <AFormItem label="知乎主页">
+          <AInput v-model:value="formModel.zhihuHomepage" allow-clear placeholder="请输入知乎主页 URL" />
+        </AFormItem>
+        <AFormItem label="CSDN 主页">
+          <AInput v-model:value="formModel.csdnHomepage" allow-clear placeholder="请输入 CSDN 主页 URL" />
+        </AFormItem>
+        <AFormItem label="抖音主页">
+          <AInput v-model:value="formModel.douyinHomepage" allow-clear placeholder="请输入抖音主页 URL" />
+        </AFormItem>
+
+        <AFormItem label="评论过滤" name="isCommentSensitiveWordOpen">
+          <ASpace direction="vertical" :size="4">
+            <ASwitch
+              v-model:checked="formModel.isCommentSensitiveWordOpen"
+              checked-children="开启"
+              un-checked-children="关闭"
+            />
+            <ATypographyText type="secondary">开启后系统会对发表的评论进行敏感词过滤。</ATypographyText>
+          </ASpace>
+        </AFormItem>
+        <AFormItem label="评论审核" name="isCommentExamineOpen">
+          <ASpace direction="vertical" :size="4">
+            <ASwitch
+              v-model:checked="formModel.isCommentExamineOpen"
+              checked-children="开启"
+              un-checked-children="关闭"
+            />
+            <ATypographyText type="secondary">开启后评论需要后台审核通过后才会展示。</ATypographyText>
+          </ASpace>
+        </AFormItem>
+        <AFormItem label="博主邮箱" name="mail">
+          <AInput v-model:value="formModel.mail" allow-clear placeholder="请输入博主邮箱地址" />
+        </AFormItem>
+
+        <div class="settings-sticky-actions">
+          <AButton type="primary" class="min-w-[120px]" :loading="submitLoading" @click="handleSubmit">
+            保存设置
+          </AButton>
+        </div>
+      </AForm>
+    </ACard>
+  </ASpace>
+</template>
+
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue';
 import type { FormInstance, FormProps } from 'ant-design-vue';
@@ -174,116 +284,6 @@ onMounted(() => {
   loadSettings();
 });
 </script>
-
-<template>
-  <ASpace direction="vertical" :size="16" class="w-full">
-
-    <ACard :bordered="false" class="card-wrapper">
-      <AForm
-        ref="formRef"
-        :model="formModel"
-        :rules="rules"
-        :label-col="formLabelCol"
-        :wrapper-col="formWrapperCol"
-        :layout="appStore.isMobile ? 'vertical' : 'horizontal'"
-        class="mx-auto max-w-[960px]"
-      >
-
-        <AFormItem label="博客名称" name="name">
-          <AInput v-model:value="formModel.name" allow-clear placeholder="请输入博客名称" />
-        </AFormItem>
-        <AFormItem label="作者名" name="author">
-          <AInput v-model:value="formModel.author" allow-clear placeholder="请输入作者名" />
-        </AFormItem>
-        <AFormItem label="博客 LOGO" name="logo">
-          <UploadPreview
-            title="上传 LOGO"
-            hint="建议尺寸 200x200px"
-            :src="formModel.logo"
-            shape="square"
-            @select="handleLogoChange"
-          />
-        </AFormItem>
-        <AFormItem label="作者头像" name="avatar">
-          <UploadPreview
-            title="上传头像"
-            hint="建议尺寸 200x200px"
-            :src="formModel.avatar"
-            shape="circle"
-            @select="handleAvatarChange"
-          />
-        </AFormItem>
-        <AFormItem label="介绍语" name="introduction">
-          <ATextarea v-model:value="formModel.introduction" :rows="3" allow-clear placeholder="请输入博客介绍语" />
-        </AFormItem>
-        <AFormItem label="版权声明" name="copyrightDeclaration">
-          <div class="no-scrollbar-textarea">
-            <ATextarea
-              v-model:value="formModel.copyrightDeclaration"
-              :auto-size="{ minRows: 3 }"
-              :maxlength="300"
-              show-count
-              allow-clear
-              placeholder="请输入版权声明内容"
-            />
-          </div>
-        </AFormItem>
-        <AFormItem label="自动切换主题" name="isAutoTheme">
-          <ASpace direction="vertical" :size="4">
-            <ASwitch v-model:checked="formModel.isAutoTheme" checked-children="开启" un-checked-children="关闭" />
-            <ATypographyText type="secondary">开启后将根据系统时间自动切换白天/黑夜主题。</ATypographyText>
-          </ASpace>
-        </AFormItem>
-
-        <AFormItem label="GitHub 主页">
-          <AInput v-model:value="formModel.githubHomepage" allow-clear placeholder="请输入 GitHub 主页 URL" />
-        </AFormItem>
-        <AFormItem label="Gitee 主页">
-          <AInput v-model:value="formModel.giteeHomepage" allow-clear placeholder="请输入 Gitee 主页 URL" />
-        </AFormItem>
-        <AFormItem label="知乎主页">
-          <AInput v-model:value="formModel.zhihuHomepage" allow-clear placeholder="请输入知乎主页 URL" />
-        </AFormItem>
-        <AFormItem label="CSDN 主页">
-          <AInput v-model:value="formModel.csdnHomepage" allow-clear placeholder="请输入 CSDN 主页 URL" />
-        </AFormItem>
-        <AFormItem label="抖音主页">
-          <AInput v-model:value="formModel.douyinHomepage" allow-clear placeholder="请输入抖音主页 URL" />
-        </AFormItem>
-
-        <AFormItem label="评论过滤" name="isCommentSensitiveWordOpen">
-          <ASpace direction="vertical" :size="4">
-            <ASwitch
-              v-model:checked="formModel.isCommentSensitiveWordOpen"
-              checked-children="开启"
-              un-checked-children="关闭"
-            />
-            <ATypographyText type="secondary">开启后系统会对发表的评论进行敏感词过滤。</ATypographyText>
-          </ASpace>
-        </AFormItem>
-        <AFormItem label="评论审核" name="isCommentExamineOpen">
-          <ASpace direction="vertical" :size="4">
-            <ASwitch
-              v-model:checked="formModel.isCommentExamineOpen"
-              checked-children="开启"
-              un-checked-children="关闭"
-            />
-            <ATypographyText type="secondary">开启后评论需要后台审核通过后才会展示。</ATypographyText>
-          </ASpace>
-        </AFormItem>
-        <AFormItem label="博主邮箱" name="mail">
-          <AInput v-model:value="formModel.mail" allow-clear placeholder="请输入博主邮箱地址" />
-        </AFormItem>
-
-        <div class="settings-sticky-actions">
-          <AButton type="primary" class="min-w-[120px]" :loading="submitLoading" @click="handleSubmit">
-            保存设置
-          </AButton>
-        </div>
-      </AForm>
-    </ACard>
-  </ASpace>
-</template>
 
 <style scoped lang="scss">
 .no-scrollbar-textarea {

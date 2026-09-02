@@ -1,104 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { CalendarOutlined, DownOutlined, UpOutlined } from '@ant-design/icons-vue';
-import { getArchivePageList, getArchiveYears } from '@/service/blog/surfer/archive';
-import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
-
-defineOptions({ name: 'SurferArchivePage' });
-
-type Api<T> = { success: boolean; data: T };
-type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
-type ArchiveMonth = { month: string; articles: ArticleItem[] };
-type ArchiveYear = { year: number; articlesTotal: number };
-type PageResult = {
-  success: boolean;
-  data: ArchiveMonth[];
-  current: number;
-  size: number;
-  total: number;
-  pages: number;
-};
-
-const route = useRoute();
-const router = useRouter();
-const archives = ref<ArchiveMonth[]>([]);
-const selectedYear = ref((route.query.year as string) || '');
-const availableYears = ref<ArchiveYear[]>([]);
-const current = computed(() => {
-  const page = Number(route.query.page);
-  return Number.isFinite(page) && page > 0 ? page : 1;
-});
-const size = ref(20);
-const total = ref(0);
-const pages = ref(0);
-const loading = ref(false);
-const isYearCollapsed = ref(true);
-
-function getArchives(pageNo: number) {
-  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
-
-  loading.value = true;
-  archives.value = [];
-  getArchivePageList<PageResult>({
-    current: pageNo,
-    size: size.value,
-    year: selectedYear.value
-  })
-    .then(res => {
-      if (res.success) {
-        archives.value = res.data || [];
-        size.value = res.size;
-        total.value = res.total;
-        pages.value = res.pages;
-      }
-    })
-    .catch(() => {
-      archives.value = [];
-      total.value = 0;
-      pages.value = 0;
-    })
-    .finally(() => {
-      loading.value = false;
-    });
-}
-
-function selectYear(year: number | '') {
-  isYearCollapsed.value = true;
-  router.push({
-    path: '/blog/surfer/archive',
-    query: { year: year ? String(year) : undefined }
-  });
-}
-
-function goArticle(articleId: number) {
-  router.push(`/blog/surfer/article/${articleId}`);
-}
-
-function goPage(page: number) {
-  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
-}
-
-watch(
-  () => [route.query.year, route.query.page],
-  () => {
-    selectedYear.value = (route.query.year as string) || '';
-    getArchives(current.value);
-  }
-);
-
-onMounted(async () => {
-  try {
-    const res = await getArchiveYears<Api<ArchiveYear[]>>();
-    if (res.success) availableYears.value = [...(res.data || [])].sort((a, b) => b.year - a.year);
-  } catch {
-    availableYears.value = [];
-  }
-
-  getArchives(current.value);
-});
-</script>
-
 <template>
   <main class="mx-auto max-w-screen-2xl px-4 md:px-6 py-4">
     <div class="grid grid-cols-1 gap-7 lg:grid-cols-4">
@@ -261,6 +160,107 @@ onMounted(async () => {
     </div>
   </main>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { CalendarOutlined, DownOutlined, UpOutlined } from '@ant-design/icons-vue';
+import { getArchivePageList, getArchiveYears } from '@/service/blog/surfer/archive';
+import SurferSidebar from '@/components/blog/surfer/sidebar-right.vue';
+
+defineOptions({ name: 'SurferArchivePage' });
+
+type Api<T> = { success: boolean; data: T };
+type ArticleItem = { id: number; title: string; cover?: string; createDate?: string };
+type ArchiveMonth = { month: string; articles: ArticleItem[] };
+type ArchiveYear = { year: number; articlesTotal: number };
+type PageResult = {
+  success: boolean;
+  data: ArchiveMonth[];
+  current: number;
+  size: number;
+  total: number;
+  pages: number;
+};
+
+const route = useRoute();
+const router = useRouter();
+const archives = ref<ArchiveMonth[]>([]);
+const selectedYear = ref((route.query.year as string) || '');
+const availableYears = ref<ArchiveYear[]>([]);
+const current = computed(() => {
+  const page = Number(route.query.page);
+  return Number.isFinite(page) && page > 0 ? page : 1;
+});
+const size = ref(20);
+const total = ref(0);
+const pages = ref(0);
+const loading = ref(false);
+const isYearCollapsed = ref(true);
+
+function getArchives(pageNo: number) {
+  if (pageNo < 1 || (pages.value > 0 && pageNo > pages.value)) return;
+
+  loading.value = true;
+  archives.value = [];
+  getArchivePageList<PageResult>({
+    current: pageNo,
+    size: size.value,
+    year: selectedYear.value
+  })
+    .then(res => {
+      if (res.success) {
+        archives.value = res.data || [];
+        size.value = res.size;
+        total.value = res.total;
+        pages.value = res.pages;
+      }
+    })
+    .catch(() => {
+      archives.value = [];
+      total.value = 0;
+      pages.value = 0;
+    })
+    .finally(() => {
+      loading.value = false;
+    });
+}
+
+function selectYear(year: number | '') {
+  isYearCollapsed.value = true;
+  router.push({
+    path: '/blog/surfer/archive',
+    query: { year: year ? String(year) : undefined }
+  });
+}
+
+function goArticle(articleId: number) {
+  router.push(`/blog/surfer/article/${articleId}`);
+}
+
+function goPage(page: number) {
+  router.replace({ query: { ...route.query, page: page > 1 ? String(page) : undefined } });
+}
+
+watch(
+  () => [route.query.year, route.query.page],
+  () => {
+    selectedYear.value = (route.query.year as string) || '';
+    getArchives(current.value);
+  }
+);
+
+onMounted(async () => {
+  try {
+    const res = await getArchiveYears<Api<ArchiveYear[]>>();
+    if (res.success) availableYears.value = [...(res.data || [])].sort((a, b) => b.year - a.year);
+  } catch {
+    availableYears.value = [];
+  }
+
+  getArchives(current.value);
+});
+</script>
 
 <style scoped lang="scss">
 @media (min-width: 1024px) {

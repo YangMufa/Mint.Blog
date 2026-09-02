@@ -1,3 +1,243 @@
+<template>
+  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
+    <div class="flex-shrink-0 bg-layout pb-4">
+      <ACard :bordered="false" class="card-wrapper">
+        <AForm layout="inline" class="responsive-search-form">
+          <AFormItem label="标签名称">
+            <AInput
+              v-model:value="query.name"
+              allow-clear
+              placeholder="请输入（模糊查询）"
+              class="w-full sm:w-[220px]"
+              @press-enter="loadData"
+            />
+          </AFormItem>
+          <AFormItem label="创建日期">
+            <ARangePicker
+              v-model:value="dateRange"
+              format="YYYY-MM-DD"
+              class="w-full sm:w-[280px]"
+              @change="handleDateChange"
+            />
+          </AFormItem>
+          <AFormItem>
+            <ASpace wrap>
+              <AButton type="primary" @click="loadData">
+                <template #icon><SearchOutlined /></template>
+                查询
+              </AButton>
+              <AButton @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </AButton>
+              <AButton type="primary" @click="openCreateModal">
+                <template #icon><PlusOutlined /></template>
+                新增
+              </AButton>
+            </ASpace>
+          </AFormItem>
+        </AForm>
+      </ACard>
+    </div>
+
+    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
+      <ATable
+        :columns="columns"
+        :data-source="tableData"
+        :loading="loading"
+        :pagination="pagination"
+        :row-key="record => record.id"
+        :row-class-name="record => (isTagDeleted(record as TagListItem) ? 'deleted-row' : '')"
+        :scroll="{ x: tableScrollX, y: tableScrollY }"
+        bordered
+        size="middle"
+        @change="handleTableChange"
+      >
+        <template #bodyCell="{ column, record, index }">
+          <template v-if="column.key === 'index'">
+            {{ index + 1 }}
+          </template>
+          <template v-else-if="column.key === 'name'">
+            <ATag class="ms-2" color="success">{{ record.name }}</ATag>
+          </template>
+          <template v-else-if="column.key === 'createTime'">
+            {{ getCreateTime(record as TagListItem) }}
+          </template>
+          <template v-else-if="column.key === 'isDeleted'">
+            <ATag :color="isTagDeleted(record as TagListItem) ? 'error' : 'success'">
+              {{ isTagDeleted(record as TagListItem) ? '已删除' : '未删除' }}
+            </ATag>
+          </template>
+          <template v-else-if="column.key === 'action'">
+            <ASpace>
+              <ATooltip title="置顶">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === 0"
+                  @click="moveTagToFirst(record as TagListItem, index)"
+                >
+                  <template #icon><VerticalAlignTopOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="置底">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveTagToLast(record as TagListItem, index)"
+                >
+                  <template #icon><VerticalAlignBottomOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="上移">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === 0"
+                  @click="moveTagUp(record as TagListItem, index)"
+                >
+                  <template #icon><UpOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="下移">
+                <AButton
+                  size="small"
+                  shape="circle"
+                  :disabled="index === tableData.length - 1"
+                  @click="moveTagDown(record as TagListItem, index)"
+                >
+                  <template #icon><DownOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="编辑">
+                <AButton size="small" shape="circle" @click="openEditModal(record as TagListItem)">
+                  <template #icon><EditOutlined /></template>
+                </AButton>
+              </ATooltip>
+              <ATooltip title="删除">
+                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as TagListItem)">
+                  <template #icon><DeleteOutlined /></template>
+                </AButton>
+              </ATooltip>
+            </ASpace>
+          </template>
+        </template>
+      </ATable>
+    </ACard>
+
+    <AModal v-model:open="createModalVisible" title="添加文章标签" :width="modalWidth" :footer="null">
+      <AForm ref="formRef" :model="createForm" layout="vertical">
+        <AFormItem label="标签列表">
+          <div class="tag-input-container">
+            <ATag v-for="tag in dynamicTags" :key="tag" class="mb-2 mr-2" closable @close="handleClose(tag)">
+              {{ tag }}
+            </ATag>
+            <div class="mt-2">
+              <AInput
+                v-if="inputVisible"
+                ref="inputRef"
+                v-model:value="inputValue"
+                class="w-32"
+                size="small"
+                placeholder="输入标签名称"
+                @keyup.enter="handleInputConfirm"
+                @blur="handleInputConfirm"
+              />
+              <AButton v-else class="button-new-tag" size="small" @click="showInput">+ 新增标签</AButton>
+            </div>
+          </div>
+        </AFormItem>
+      </AForm>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="cancelCreateTag">取消</AButton>
+        <AButton type="primary" size="middle" :loading="submitLoading" @click="handleCreateSubmit">确定</AButton>
+      </div>
+    </AModal>
+
+    <AModal
+      v-model:open="deleteModalVisible"
+      title="删除标签"
+      :width="deleteModalWidth"
+      :footer="null"
+      wrap-class-name="delete-dialog"
+    >
+      <div class="delete-content py-4">
+        <div class="mb-4 flex items-center">
+          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
+            <DeleteOutlined />
+          </div>
+          <div>
+            <div class="font-medium text-gray-900 dark:text-white">确认删除标签</div>
+            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除方式，不同方式的影响不同</div>
+          </div>
+        </div>
+        <div class="delete-info mb-4 rounded-lg p-4">
+          <p class="text-sm">
+            是否确定要删除标签
+            <span class="font-medium">"{{ currentDeleteTag?.name }}"</span>
+            ？
+          </p>
+          <p class="mt-2 text-xs">删除后该标签下的所有文章将移除此标签</p>
+        </div>
+        <div class="delete-type-selection">
+          <div class="mb-3 text-sm font-medium text-gray-900 dark:text-white">删除方式：</div>
+          <ARadioGroup v-model:value="deleteType" class="w-full">
+            <div class="flex flex-col gap-3">
+              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
+                <div class="ml-2">
+                  <div class="font-medium">逻辑删除</div>
+                  <div class="mt-1 text-xs text-gray-500">标签将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
+                </div>
+              </ARadio>
+              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
+                <div class="ml-2">
+                  <div class="font-medium">物理删除</div>
+                  <div class="mt-1 text-xs text-gray-500">标签将从数据库中彻底删除，此操作不可撤销</div>
+                  <div v-if="(currentDeleteTag?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
+                    当前标签下还有 {{ currentDeleteTag?.articlesTotal }} 篇文章，不能物理删除
+                  </div>
+                </div>
+              </ARadio>
+              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
+                <div class="ml-2">
+                  <div class="font-medium">取消删除</div>
+                  <div class="mt-1 text-xs text-gray-500">恢复已删除的标签，使其重新可用</div>
+                </div>
+              </ARadio>
+            </div>
+          </ARadioGroup>
+        </div>
+      </div>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
+        <AButton
+          type="primary"
+          :danger="deleteType !== 3"
+          size="middle"
+          :loading="deleteLoading"
+          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
+          @click="handleDelete"
+        >
+          {{ getDeleteButtonText() }}
+        </AButton>
+      </div>
+    </AModal>
+
+    <AModal v-model:open="editModalVisible" title="编辑标签" :width="editModalWidth" :footer="null">
+      <AForm ref="editFormRef" :model="editForm" layout="vertical">
+        <AFormItem label="标签名称" name="name" :rules="[{ required: true, message: '请输入标签名称' }]">
+          <AInput v-model:value="editForm.name" allow-clear show-count :maxlength="20" placeholder="请输入标签名称" />
+        </AFormItem>
+      </AForm>
+      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
+        <AButton size="middle" @click="cancelEditTag">取消</AButton>
+        <AButton type="primary" size="middle" :loading="editSubmitLoading" @click="handleEditSubmit">确定</AButton>
+      </div>
+    </AModal>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import type { FormInstance, TableColumnsType } from 'ant-design-vue';
@@ -410,246 +650,6 @@ onMounted(() => {
   loadData();
 });
 </script>
-
-<template>
-  <div class="category-page flex h-full min-h-0 w-full flex-col overflow-hidden">
-    <div class="flex-shrink-0 bg-layout pb-4">
-      <ACard :bordered="false" class="card-wrapper">
-        <AForm layout="inline" class="responsive-search-form">
-          <AFormItem label="标签名称">
-            <AInput
-              v-model:value="query.name"
-              allow-clear
-              placeholder="请输入（模糊查询）"
-              class="w-full sm:w-[220px]"
-              @press-enter="loadData"
-            />
-          </AFormItem>
-          <AFormItem label="创建日期">
-            <ARangePicker
-              v-model:value="dateRange"
-              format="YYYY-MM-DD"
-              class="w-full sm:w-[280px]"
-              @change="handleDateChange"
-            />
-          </AFormItem>
-          <AFormItem>
-            <ASpace wrap>
-              <AButton type="primary" @click="loadData">
-                <template #icon><SearchOutlined /></template>
-                查询
-              </AButton>
-              <AButton @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </AButton>
-              <AButton type="primary" @click="openCreateModal">
-                <template #icon><PlusOutlined /></template>
-                新增
-              </AButton>
-            </ASpace>
-          </AFormItem>
-        </AForm>
-      </ACard>
-    </div>
-
-    <ACard :bordered="false" class="card-wrapper table-card flex-1 min-h-0 overflow-hidden">
-      <ATable
-        :columns="columns"
-        :data-source="tableData"
-        :loading="loading"
-        :pagination="pagination"
-        :row-key="record => record.id"
-        :row-class-name="record => (isTagDeleted(record as TagListItem) ? 'deleted-row' : '')"
-        :scroll="{ x: tableScrollX, y: tableScrollY }"
-        bordered
-        size="middle"
-        @change="handleTableChange"
-      >
-        <template #bodyCell="{ column, record, index }">
-          <template v-if="column.key === 'index'">
-            {{ index + 1 }}
-          </template>
-          <template v-else-if="column.key === 'name'">
-            <ATag class="ms-2" color="success">{{ record.name }}</ATag>
-          </template>
-          <template v-else-if="column.key === 'createTime'">
-            {{ getCreateTime(record as TagListItem) }}
-          </template>
-          <template v-else-if="column.key === 'isDeleted'">
-            <ATag :color="isTagDeleted(record as TagListItem) ? 'error' : 'success'">
-              {{ isTagDeleted(record as TagListItem) ? '已删除' : '未删除' }}
-            </ATag>
-          </template>
-          <template v-else-if="column.key === 'action'">
-            <ASpace>
-              <ATooltip title="置顶">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === 0"
-                  @click="moveTagToFirst(record as TagListItem, index)"
-                >
-                  <template #icon><VerticalAlignTopOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="置底">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveTagToLast(record as TagListItem, index)"
-                >
-                  <template #icon><VerticalAlignBottomOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="上移">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === 0"
-                  @click="moveTagUp(record as TagListItem, index)"
-                >
-                  <template #icon><UpOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="下移">
-                <AButton
-                  size="small"
-                  shape="circle"
-                  :disabled="index === tableData.length - 1"
-                  @click="moveTagDown(record as TagListItem, index)"
-                >
-                  <template #icon><DownOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="编辑">
-                <AButton size="small" shape="circle" @click="openEditModal(record as TagListItem)">
-                  <template #icon><EditOutlined /></template>
-                </AButton>
-              </ATooltip>
-              <ATooltip title="删除">
-                <AButton danger size="small" shape="circle" @click="openDeleteModal(record as TagListItem)">
-                  <template #icon><DeleteOutlined /></template>
-                </AButton>
-              </ATooltip>
-            </ASpace>
-          </template>
-        </template>
-      </ATable>
-    </ACard>
-
-    <AModal v-model:open="createModalVisible" title="添加文章标签" :width="modalWidth" :footer="null">
-      <AForm ref="formRef" :model="createForm" layout="vertical">
-        <AFormItem label="标签列表">
-          <div class="tag-input-container">
-            <ATag v-for="tag in dynamicTags" :key="tag" class="mb-2 mr-2" closable @close="handleClose(tag)">
-              {{ tag }}
-            </ATag>
-            <div class="mt-2">
-              <AInput
-                v-if="inputVisible"
-                ref="inputRef"
-                v-model:value="inputValue"
-                class="w-32"
-                size="small"
-                placeholder="输入标签名称"
-                @keyup.enter="handleInputConfirm"
-                @blur="handleInputConfirm"
-              />
-              <AButton v-else class="button-new-tag" size="small" @click="showInput">+ 新增标签</AButton>
-            </div>
-          </div>
-        </AFormItem>
-      </AForm>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="cancelCreateTag">取消</AButton>
-        <AButton type="primary" size="middle" :loading="submitLoading" @click="handleCreateSubmit">确定</AButton>
-      </div>
-    </AModal>
-
-    <AModal
-      v-model:open="deleteModalVisible"
-      title="删除标签"
-      :width="deleteModalWidth"
-      :footer="null"
-      wrap-class-name="delete-dialog"
-    >
-      <div class="delete-content py-4">
-        <div class="mb-4 flex items-center">
-          <div class="warning-icon mr-3 flex h-8 w-8 items-center justify-center rounded-full">
-            <DeleteOutlined />
-          </div>
-          <div>
-            <div class="font-medium text-gray-900 dark:text-white">确认删除标签</div>
-            <div class="mt-1 text-sm text-gray-500 dark:text-gray-400">请选择删除方式，不同方式的影响不同</div>
-          </div>
-        </div>
-        <div class="delete-info mb-4 rounded-lg p-4">
-          <p class="text-sm">
-            是否确定要删除标签
-            <span class="font-medium">"{{ currentDeleteTag?.name }}"</span>
-            ？
-          </p>
-          <p class="mt-2 text-xs">删除后该标签下的所有文章将移除此标签</p>
-        </div>
-        <div class="delete-type-selection">
-          <div class="mb-3 text-sm font-medium text-gray-900 dark:text-white">删除方式：</div>
-          <ARadioGroup v-model:value="deleteType" class="w-full">
-            <div class="flex flex-col gap-3">
-              <ARadio :value="1" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(1)">
-                <div class="ml-2">
-                  <div class="font-medium">逻辑删除</div>
-                  <div class="mt-1 text-xs text-gray-500">标签将被标记为已删除，但数据仍保留在数据库中，可以恢复</div>
-                </div>
-              </ARadio>
-              <ARadio :value="2" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(2)">
-                <div class="ml-2">
-                  <div class="font-medium">物理删除</div>
-                  <div class="mt-1 text-xs text-gray-500">标签将从数据库中彻底删除，此操作不可撤销</div>
-                  <div v-if="(currentDeleteTag?.articlesTotal ?? 0) > 0" class="mt-1 text-xs text-red-500">
-                    当前标签下还有 {{ currentDeleteTag?.articlesTotal }} 篇文章，不能物理删除
-                  </div>
-                </div>
-              </ARadio>
-              <ARadio :value="3" class="flex w-full items-start" :disabled="isDeleteTypeDisabled(3)">
-                <div class="ml-2">
-                  <div class="font-medium">取消删除</div>
-                  <div class="mt-1 text-xs text-gray-500">恢复已删除的标签，使其重新可用</div>
-                </div>
-              </ARadio>
-            </div>
-          </ARadioGroup>
-        </div>
-      </div>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="handleDeleteCancel">取消</AButton>
-        <AButton
-          type="primary"
-          :danger="deleteType !== 3"
-          size="middle"
-          :loading="deleteLoading"
-          :disabled="!deleteType || isDeleteTypeDisabled(deleteType)"
-          @click="handleDelete"
-        >
-          {{ getDeleteButtonText() }}
-        </AButton>
-      </div>
-    </AModal>
-
-    <AModal v-model:open="editModalVisible" title="编辑标签" :width="editModalWidth" :footer="null">
-      <AForm ref="editFormRef" :model="editForm" layout="vertical">
-        <AFormItem label="标签名称" name="name" :rules="[{ required: true, message: '请输入标签名称' }]">
-          <AInput v-model:value="editForm.name" allow-clear show-count :maxlength="20" placeholder="请输入标签名称" />
-        </AFormItem>
-      </AForm>
-      <div class="modal-footer mt-6 flex justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-600">
-        <AButton size="middle" @click="cancelEditTag">取消</AButton>
-        <AButton type="primary" size="middle" :loading="editSubmitLoading" @click="handleEditSubmit">确定</AButton>
-      </div>
-    </AModal>
-  </div>
-</template>
 
 <style scoped lang="scss">
 .category-page {

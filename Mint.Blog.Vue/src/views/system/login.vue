@@ -1,51 +1,3 @@
-<script setup lang="ts">
-import { computed, reactive } from 'vue';
-import { LockOutlined, UserOutlined } from '@ant-design/icons-vue';
-import { useAppStore } from '@/store/system/app';
-import { useAuthStore } from '@/store/system/auth';
-import { useThemeStore } from '@/store/system/theme';
-import { useAntdForm, useFormRules } from '@/hooks/form/use-antd-form';
-import loadingSvg from '@/assets/system/svg/loading-lemonade.svg';
-import { $t } from '@/locales';
-
-defineOptions({
-  name: 'SystemLogin'
-});
-
-interface LoginForm {
-  userName: string;
-  password: string;
-}
-
-const authStore = useAuthStore();
-const appStore = useAppStore();
-const themeStore = useThemeStore();
-const { formRef, validate } = useAntdForm();
-
-const form: LoginForm = reactive({
-  userName: 'VisitorAdmin',
-  password: 'VisitorAdmin'
-});
-
-const rules = computed<Record<keyof LoginForm, App.Global.FormRule[]>>(() => {
-  const { formRules } = useFormRules();
-
-  return {
-    userName: formRules.userName,
-    password: formRules.pwd
-  };
-});
-
-async function handleEnter() {
-  await handleSubmit();
-}
-
-async function handleSubmit() {
-  await validate();
-  await authStore.login(form.userName, form.password);
-}
-</script>
-
 <template>
   <div
     class="login-page !p-0 fixed inset-0 grid grid-cols-1 overflow-hidden bg-gradient-to-br from-[#fffbe6] via-[#fdf1b5] to-[#d5f7e8] transition-all duration-500 dark:from-[#181f2a] dark:via-[#232b38] dark:to-[#111827] lg:grid-cols-2"
@@ -224,6 +176,54 @@ async function handleSubmit() {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, reactive } from 'vue';
+import { LockOutlined, UserOutlined } from '@ant-design/icons-vue';
+import { useAppStore } from '@/store/system/app';
+import { useAuthStore } from '@/store/system/auth';
+import { useThemeStore } from '@/store/system/theme';
+import { useAntdForm, useFormRules } from '@/hooks/form/use-antd-form';
+import loadingSvg from '@/assets/system/svg/loading-lemonade.svg';
+import { $t } from '@/locales';
+
+defineOptions({
+  name: 'SystemLogin'
+});
+
+interface LoginForm {
+  userName: string;
+  password: string;
+}
+
+const authStore = useAuthStore();
+const appStore = useAppStore();
+const themeStore = useThemeStore();
+const { formRef, validate } = useAntdForm();
+
+const form: LoginForm = reactive({
+  userName: 'VisitorAdmin',
+  password: 'VisitorAdmin'
+});
+
+const rules = computed<Record<keyof LoginForm, App.Global.FormRule[]>>(() => {
+  const { formRules } = useFormRules();
+
+  return {
+    userName: formRules.userName,
+    password: formRules.pwd
+  };
+});
+
+async function handleEnter() {
+  await handleSubmit();
+}
+
+async function handleSubmit() {
+  await validate();
+  await authStore.login(form.userName, form.password);
+}
+</script>
 
 <style lang="scss" scoped>
 .login-page {
